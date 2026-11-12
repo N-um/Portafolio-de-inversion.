@@ -3,10 +3,10 @@
 Uso (desde la carpeta del proyecto):
     python pruebas/comparar_con_excel.py [ruta_del_excel]
 
-Lee los datos de las hojas Activos, Operaciones y Pagos del Excel, los carga en un
-Portafolio con la misma fecha de corte, y compara cada indicador con el valor que
-calculó el Excel. Necesita openpyxl (pip install openpyxl). El Excel debe haberse
-guardado después de abrirlo, para que tenga los valores calculados.
+Lee los datos de las hojas Operaciones, Pagos y Mercado del Excel, los carga en un
+Portafolio con la misma fecha de corte, y compara cada indicador, cada activo y cada día
+de la hoja "Valor diario" con lo que calculó el Excel. Necesita openpyxl.
+El Excel debe haberse abierto y guardado (para que tenga los valores calculados).
 """
 import os
 import sys
@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from openpyxl import load_workbook  # noqa: E402
 
 from activo import Activo  # noqa: E402
+from mercado import Mercado  # noqa: E402
 from operacion import Operacion  # noqa: E402
 from pago import Pago  # noqa: E402
 from portafolio import Portafolio  # noqa: E402
@@ -38,79 +39,109 @@ def filas(hoja, primera=5):
 
 
 def cargar_desde_excel(libro):
-    fecha_corte = a_fecha(libro["Resumen"]["C4"].value)
-    portafolio = Portafolio(ruta=None, fecha_corte=fecha_corte)
-    for nombre, _t, _ti, _c, _s, precio in [f[:6] for f in filas(libro["Activos"])]:
-        if precio not in (None, ""):
-            portafolio.precios_manuales[nombre] = float(precio)
+    resumen = libro["Resumen"]
+    if abs(resumen["C5"].value - Operacion.TASA_COMISION) > 1e-12:
+        sys.exit(f"La comisión del Excel ({resumen['C5'].value}) no es la del programa ({Operacion.TASA_COMISION}).")
+    mercado = Mercado()
+    for f in filas(libro["Mercado"]):
+        mercado.agregar(f[1], a_fecha(f[0]), f[2], f[3])
+    portafolio = Portafolio(fecha_corte=a_fecha(resumen["C4"].value), mercado=mercado)
     for f in filas(libro["Operaciones"]):
         activo = Activo.buscar(f[1])
-        portafolio.agregar_operacion(Operacion(
-            a_fecha(f[0]), activo.tipo, f[1], f[2], f[3], f[4], f[5] or 0, f[6] or 0, a_fecha(f[7])))
+        portafolio.agregar_operacion(Operacion(a_fecha(f[0]), activo.tipo, f[1], f[2], f[3], f[4],
+                                               f[5] or 0, a_fecha(f[6])))
     for f in filas(libro["Pagos"]):
         portafolio.agregar_pago(Pago(a_fecha(f[0]), f[1], f[2], f[3]))
     return portafolio
 
 
-def comparar(nombre, programa, excel, es_tasa=False):
-    if excel == "N/A":
-        excel = None
-    if programa is None or excel is None:
-        ok = programa is None and excel is None
-    else:
-        ok = abs(programa - excel) <= (TOLERANCIA_TASA if es_tasa else TOLERANCIA_COP)
-    fmt = (lambda x: "N/A" if x is None else f"{x * 100:,.6f}%") if es_tasa else \
-          (lambda x: "N/A" if x is None else f"{x:,.2f}")
-    print(f"  {'OK ' if ok else 'XX '} {nombre:<32} programa={fmt(programa):>20}   excel={fmt(excel):>20}")
-    return ok
+class Comparador:
+    def __init__(self):
+        self.total = 0
+        self.fallas = 0
+
+    def __call__(self, nombre, programa, excel, es_tasa=False, mostrar=True):
+        if excel in ("N/A", ""):
+            excel = None
+        if programa is None or excel is None:
+            ok = programa is None and excel is None
+        else:
+            ok = abs(programa - excel) <= (TOLERANCIA_TASA if es_tasa else TOLERANCIA_COP)
+        self.total += 1
+        self.fallas += 0 if ok else 1
+        if mostrar or not ok:
+            fmt = (lambda x: "N/A" if x is None else f"{x * 100:,.6f}%") if es_tasa else \
+                  (lambda x: "N/A" if x is None else f"{x:,.2f}")
+            print(f"  {'OK ' if ok else 'XX '} {nombre:<34} programa={fmt(programa):>20}   excel={fmt(excel):>20}")
+        return ok
 
 
 def main():
     ruta = sys.argv[1] if len(sys.argv) > 1 else RUTA_EXCEL
     valores = load_workbook(ruta, data_only=True)
-    if valores["Resumen"]["C7"].value is None:
+    hoja = valores["Resumen"]
+    if hoja["C10"].value is None:
         sys.exit("El Excel no tiene valores calculados: ábralo en Excel, guárdelo y vuelva a intentar.")
+    celda = {str(f[1]).strip(): f[2] for f in hoja.iter_rows(min_row=4, max_row=30, values_only=True) if f[1]}
 
     portafolio = cargar_desde_excel(valores)
     r = portafolio.resumen()
-    hoja = valores["Resumen"]
-    print(f"Fecha de corte: {portafolio.fecha_corte}\n\nPortafolio")
-    resultados = [
-        comparar("Total invertido", r["invertido"], hoja["C7"].value),
-        comparar("Ventas netas", r["ventas"], hoja["C8"].value),
-        comparar("Dividendos e intereses", r["ingresos"], hoja["C9"].value),
-        comparar("Pagos de capital", r["capital"], hoja["C10"].value),
-        comparar("Comisiones", r["comisiones"], hoja["C11"].value),
-        comparar("Valor actual", r["valor_actual"], hoja["C12"].value),
-        comparar("Ganancia total", r["ganancia"], hoja["C13"].value),
-        comparar("Ganancia no realizada", r["no_realizada"], hoja["C14"].value),
-        comparar("Ganancia realizada", r["realizada"], hoja["C15"].value),
-        comparar("Rentabilidad acumulada", r["rent_acumulada"], hoja["C16"].value, True),
-        comparar("Rentabilidad E.A.", r["rent_ea"], hoja["C17"].value, True),
-        comparar("Renta fija", r["renta_fija"], hoja["C20"].value),
-        comparar("Renta variable", r["renta_variable"], hoja["C21"].value),
-    ]
+    comparar = Comparador()
+    print(f"Fecha de corte: {portafolio.fecha_corte}   Comisión: {Operacion.TASA_COMISION:.2%}\n\nPortafolio")
+    comparar("TRM a la fecha de corte", r["trm"], celda["TRM a la fecha de corte"])
+    for clave, etiqueta in (("invertido", "Total invertido"), ("ventas", "Ventas netas recibidas"),
+                            ("ingresos", "Dividendos e intereses"), ("capital", "Pagos de capital"),
+                            ("comisiones", "Comisiones pagadas"), ("valor_actual", "Valor actual del portafolio"),
+                            ("ganancia", "Ganancia / pérdida total"), ("no_realizada", "Ganancia no realizada"),
+                            ("realizada", "Ganancia realizada"), ("renta_fija", "Renta fija"),
+                            ("renta_variable", "Renta variable")):
+        comparar(etiqueta, r[clave], celda[etiqueta])
+    comparar("Rentabilidad acumulada", r["rent_acumulada"], celda["Rentabilidad acumulada"], True)
+    comparar("Rentabilidad E.A.", r["rent_ea"], celda["Rentabilidad efectiva anual (E.A.)"], True)
 
-    por_activo = valores["Por activo"]
-    for fila in por_activo.iter_rows(min_row=5, max_row=14, values_only=True):
+    for fila in valores["Por activo"].iter_rows(min_row=5, max_row=14, values_only=True):
         nombre = fila[0]
         if not nombre or nombre not in r["por_activo"]:
             continue
         a = r["por_activo"][nombre]
         print(f"\n{nombre}")
-        resultados += [
-            comparar("Cantidad", a["cantidad"], fila[3]),
-            comparar("Total invertido", a["compras"], fila[4]),
-            comparar("Dividendos / intereses", a["pagos"], fila[7]),
-            comparar("Valor actual", a["valor"], fila[12]),
-            comparar("Ganancia", a["ganancia"], fila[16]),
-            comparar("Rentabilidad acumulada", a["rent"], fila[18], True),
-            comparar("Rentabilidad E.A.", a["rent_ea"], fila[19], True),
-            comparar("Peso", a["peso"], fila[20], True),
-        ]
+        comparar("Cantidad", a["cantidad"], fila[5])
+        comparar("Total invertido", a["compras"], fila[6])
+        comparar("Dividendos / intereses", a["pagos"], fila[9])
+        comparar("Valor actual", a["valor"], fila[17])
+        comparar("Ganancia", a["ganancia"], fila[21])
+        comparar("Rentabilidad acumulada", a["rent"], fila[23], True)
+        comparar("Rentabilidad E.A.", a["rent_ea"], fila[24], True)
+        comparar("Peso", a["peso"], fila[25], True)
 
-    print(f"\n{sum(resultados)} de {len(resultados)} valores coinciden.")
-    sys.exit(0 if all(resultados) else 1)
+    diario = valores["Valor diario"]
+    nombres = [diario.cell(7, c).value for c in range(3, 13)]
+    excel_dias = [f for f in diario.iter_rows(min_row=8, values_only=True) if f[0] not in (None, "")]
+    antes = comparar.total, comparar.fallas
+    if excel_dias:
+        programa_dias = portafolio.valor_diario(a_fecha(excel_dias[0][0]), a_fecha(excel_dias[-1][0]))
+        if len(programa_dias) != len(excel_dias):
+            print(f"\nXX Valor diario: el programa tiene {len(programa_dias)} días y el Excel {len(excel_dias)}")
+            comparar.fallas += 1
+        for p, e in zip(programa_dias, excel_dias):
+            dia = p["fecha"].isoformat()
+            if p["fecha"] != a_fecha(e[0]):
+                print(f"XX fechas distintas: {p['fecha']} / {e[0]}")
+                comparar.fallas += 1
+                break
+            comparar(f"{dia} TRM", p["trm"], e[1], mostrar=False)
+            for k, nombre in enumerate(nombres):
+                if nombre:
+                    comparar(f"{dia} {nombre}", p["por_activo"].get(nombre, 0.0), e[2 + k], mostrar=False)
+            comparar(f"{dia} Renta variable", p["renta_variable"], e[12], mostrar=False)
+            comparar(f"{dia} Renta fija", p["renta_fija"], e[13], mostrar=False)
+            comparar(f"{dia} Total", p["total"], e[14], mostrar=False)
+        print(f"\nValor diario del {excel_dias[0][0]:%Y-%m-%d} al {excel_dias[-1][0]:%Y-%m-%d}: "
+              f"{len(excel_dias)} días, {comparar.total - antes[0] - (comparar.fallas - antes[1])} de "
+              f"{comparar.total - antes[0]} valores coinciden.")
+
+    print(f"\nTOTAL: {comparar.total - comparar.fallas} de {comparar.total} valores coinciden.")
+    sys.exit(0 if comparar.fallas == 0 else 1)
 
 
 if __name__ == "__main__":

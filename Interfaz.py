@@ -15,6 +15,7 @@ ROJO = "#C0392B"
 COLOR_FIJA = "#2E86AB"
 COLOR_VARIABLE = "#F18F01"
 
+
 def dinero(x):
     return f"${x:,.0f}" if x >= 0 else f"-${-x:,.0f}"
 
@@ -28,14 +29,13 @@ def color_signo(x):
 
 
 class Interfaz:
-    """Ventana principal con 4 pestañas: Resumen, Operaciones, Dividendos e intereses y Valoración."""
 
     def __init__(self, portafolio: Portafolio):
         self.portafolio = portafolio
         self.activos = Activo.catalogo()
         self.nombres = [a.nombre for a in self.activos]
-        self.ops_en_tabla = {}    # id de fila -> Operacion
-        self.pagos_en_tabla = {}  # id de fila -> Pago
+        self.ops_en_tabla = {}
+        self.pagos_en_tabla = {} 
 
         self.root = tk.Tk()
         self.root.title("Seguimiento de Portafolio de Inversión")
@@ -70,10 +70,9 @@ class Interfaz:
         self.root.lift()
 
     def ejecutar(self):
-        self.root.after(200, self.root.update)  # fuerza el redibujado en macOS
+        self.root.after(200, self.root.update)
         self.root.mainloop()
 
-    # ---------- Utilidades de diseño ----------
     def _estilos(self):
         estilo = ttk.Style()
         estilo.theme_use("clam")
@@ -113,7 +112,6 @@ class Interfaz:
         tk.Label(marco, text=titulo, bg="white", fg=AZUL, font=("Segoe UI", 11, "bold")).pack(pady=(8, 2))
         return marco
 
-    # ---------- Pestaña Resumen ----------
     def _armar_resumen(self):
         self.kpis = {}
         fila = tk.Frame(self.tab_resumen, bg=FONDO)
@@ -234,7 +232,6 @@ class Interfaz:
             c.create_text(100 + largo, y + 10, anchor="w", font=("Segoe UI", 9, "bold"),
                           text=f"{a['peso'] * 100:.1f}%")
 
-    # ---------- Pestaña Operaciones ----------
     def _armar_operaciones(self):
         form = tk.Frame(self.tab_ops, bg=FONDO)
         form.pack(fill="x", padx=10, pady=(10, 0))
@@ -271,7 +268,7 @@ class Interfaz:
                                      if activo.es_renta_fija else "Precio = valor de la acción."))
         for campo, vacio in ((self.op_tasa, "0"), (self.op_venc, "")):
             campo.state(["!disabled"])
-            if not activo.es_renta_fija:  # las acciones no tienen tasa ni vencimiento
+            if not activo.es_renta_fija: 
                 campo.delete(0, "end")
                 campo.insert(0, vacio)
                 campo.state(["disabled"])
@@ -301,7 +298,6 @@ class Interfaz:
             self.portafolio.eliminar_operacion(self.ops_en_tabla[seleccion[0]])
             self.actualizar()
 
-    # ---------- Pestaña Pagos ----------
     def _armar_pagos(self):
         form = tk.Frame(self.tab_pagos, bg=FONDO)
         form.pack(fill="x", padx=10, pady=10)
@@ -395,3 +391,32 @@ class Interfaz:
         for tabla in (self.tabla_ops, self.tabla_pagos, self.tabla_val):
             tabla.delete(*tabla.get_children())
         self.ops_en_tabla, self.pagos_en_tabla = {}, {}
+
+        for o in sorted(self.portafolio.operaciones, key=lambda x: x.fecha):
+            fila = self.tabla_ops.insert("", "end", tags=("neg" if o.tipo_operacion == "Venta" else "pos",),
+                                         values=(o.fecha, o.nombre, o.tipo_activo, o.tipo_operacion,
+                                                 f"{o.cantidad:g}", dinero(o.precio), dinero(o.comision),
+                                                 dinero(o.flujo_de_caja())))
+            self.ops_en_tabla[fila] = o
+        for p in sorted(self.portafolio.pagos, key=lambda x: x.fecha):
+            fila = self.tabla_pagos.insert("", "end", values=(p.fecha, p.nombre, p.tipo, dinero(p.monto)))
+            self.pagos_en_tabla[fila] = p
+
+        hoy = date.today()
+        for nombre, p in self.portafolio.posiciones().items():
+            gan = p["valor"] - p["costo"]
+            rent = gan / p["costo"] if p["costo"] > 0 else None
+            c = p["compra"]
+            tasa = porcentaje(c.tasa_ea) if c and c.tasa_ea > 0 else "-"
+            vence = c.vencimiento.isoformat() if c and c.vencimiento else "-"
+            dias = str(max((c.vencimiento - hoy).days, 0)) if c and c.vencimiento else "-"
+            self.tabla_val.insert("", "end", tags=("pos" if gan >= 0 else "neg",), values=(
+                nombre, f"{p['cantidad']:g}", dinero(p["costo"]), dinero(p["precio"]),
+                "Manual" if p["manual"] else "Automático", dinero(p["valor"]),
+                dinero(gan), porcentaje(rent), tasa, vence, dias))
+
+        self._actualizar_resumen()
+        try:
+            self.portafolio.guardar()
+        except OSError:
+            pass

@@ -2,19 +2,22 @@ class Activo:
     """Un instrumento del catálogo: una acción (renta variable) o un título de renta fija.
 
     El catálogo es fijo y es el mismo que aparece en la hoja "Activos" del Excel de control.
+    Las acciones se cotizan con yfinance; la renta fija (CDT, bonos, TES) no está en Yahoo
+    Finance y se valora con su tasa E.A.
     """
 
     RENTA_FIJA = "Renta fija"
     RENTA_VARIABLE = "Renta variable"
 
-    def __init__(self, nombre, ticker, tipo, clase, sector, color):
+    def __init__(self, nombre, ticker, tipo, clase, sector, moneda, color):
         if tipo not in (Activo.RENTA_FIJA, Activo.RENTA_VARIABLE):
             raise ValueError(f"Tipo de activo desconocido: {tipo}")
         self.nombre = nombre
-        self.ticker = ticker
+        self.ticker = ticker  # acciones: símbolo de Yahoo Finance (yfinance); renta fija: código interno
         self.tipo = tipo      # Renta fija / Renta variable
         self.clase = clase    # Acción, CDT, Bono o TES
         self.sector = sector
+        self.moneda = moneda  # COP o USD: moneda en que se registran precios y pagos del activo
         self.color = color    # color usado en los gráficos de la interfaz
 
     @property
@@ -27,13 +30,13 @@ class Activo:
     @staticmethod
     def catalogo():
         return [
-            Activo("Ecopetrol", "ECOPETROL", Activo.RENTA_VARIABLE, "Acción", "Energía", "#F18F01"),
-            Activo("Bancolombia", "PFBCOLOM", Activo.RENTA_VARIABLE, "Acción", "Financiero", "#C73E1D"),
-            Activo("Nike", "NKE", Activo.RENTA_VARIABLE, "Acción", "Consumo", "#6A4C93"),
-            Activo("CDT Davivienda", "CDT-DAV", Activo.RENTA_FIJA, "CDT", "Financiero", "#2E86AB"),
-            Activo("CDT Bancolombia", "CDT-BCO", Activo.RENTA_FIJA, "CDT", "Financiero", "#3BB273"),
-            Activo("Bono Ecopetrol", "BONO-ECO", Activo.RENTA_FIJA, "Bono", "Energía", "#1F3A5F"),
-            Activo("TES 2031", "TES-2031", Activo.RENTA_FIJA, "TES", "Gobierno", "#7FB7BE"),
+            Activo("Ecopetrol", "ECOPETROL.CL", Activo.RENTA_VARIABLE, "Acción", "Energía", "COP", "#F18F01"),
+            Activo("Grupo Cibest", "CIB", Activo.RENTA_VARIABLE, "Acción", "Financiero", "USD", "#C73E1D"),
+            Activo("Nike", "NKE", Activo.RENTA_VARIABLE, "Acción", "Consumo", "USD", "#6A4C93"),
+            Activo("CDT Davivienda", "CDT-DAV", Activo.RENTA_FIJA, "CDT", "Financiero", "COP", "#2E86AB"),
+            Activo("CDT Bancolombia", "CDT-BCO", Activo.RENTA_FIJA, "CDT", "Financiero", "COP", "#3BB273"),
+            Activo("Bono Ecopetrol", "BONO-ECO", Activo.RENTA_FIJA, "Bono", "Energía", "COP", "#1F3A5F"),
+            Activo("TES 2031", "TES-2031", Activo.RENTA_FIJA, "TES", "Gobierno", "COP", "#7FB7BE"),
         ]
 
     @staticmethod

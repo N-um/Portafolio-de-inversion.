@@ -7,6 +7,8 @@ class Pago:
     - Dividendo: lo pagan las acciones.
     - Interés: lo paga la renta fija (cupón o intereses al vencimiento).
     - Capital: la renta fija devuelve parte o todo el dinero invertido.
+
+    El monto se escribe en la moneda del activo; Posicion lo pasa a pesos con la TRM del día.
     """
 
     DIVIDENDO = "Dividendo"

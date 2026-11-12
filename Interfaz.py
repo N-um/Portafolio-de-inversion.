@@ -163,7 +163,7 @@ class Interfaz:
 
     def _actualizar_resumen(self):
         r = self.portafolio.resumen()
-        self.lbl_fecha.config(text=f"Valoración al {date.today():%d/%m/%Y}")
+        self.lbl_fecha.config(text=f"Valoración al {r['fecha_corte']:%d/%m/%Y}")
         self.kpis["invertido"].config(text=dinero(r["invertido"]))
         self.kpis["valor_actual"].config(text=dinero(r["valor_actual"]))
         self.kpis["ganancia"].config(text=dinero(r["ganancia"]), fg=color_signo(r["ganancia"]))
@@ -298,7 +298,11 @@ class Interfaz:
             messagebox.showinfo("Operaciones", "Primero selecciona una operación de la tabla.")
             return
         if messagebox.askyesno("Eliminar", "¿Eliminar la operación seleccionada?"):
-            self.portafolio.eliminar_operacion(self.ops_en_tabla[seleccion[0]])
+            try:
+                self.portafolio.eliminar_operacion(self.ops_en_tabla[seleccion[0]])
+            except ValueError as e:  # p. ej. quitar una compra que respalda una venta posterior
+                messagebox.showerror("No se puede eliminar", str(e))
+                return
             self.actualizar()
 
     # ---------- Pestaña Pagos ----------
@@ -395,3 +399,23 @@ class Interfaz:
         for tabla in (self.tabla_ops, self.tabla_pagos, self.tabla_val):
             tabla.delete(*tabla.get_children())
         self.ops_en_tabla, self.pagos_en_tabla = {}, {}
+
+        for op in self.portafolio.operaciones_ordenadas():
+            fila = self.tabla_ops.insert("", "end", tags=("pos" if op.flujo_caja >= 0 else "neg",), values=(
+                op.fecha.isoformat(), op.activo, op.tipo_activo, op.tipo_operacion, f"{op.cantidad:g}",
+                dinero(op.precio), dinero(op.comision), dinero(op.flujo_caja)))
+            self.ops_en_tabla[fila] = op
+
+        for pago in self.portafolio.pagos_ordenados():
+            fila = self.tabla_pagos.insert("", "end", values=(
+                pago.fecha.isoformat(), pago.activo, pago.tipo, dinero(pago.monto)))
+            self.pagos_en_tabla[fila] = pago
+
+        for v in self.portafolio.valoracion():
+            self.tabla_val.insert("", "end", tags=("pos" if v["no_realizada"] >= 0 else "neg",), values=(
+                v["activo"], f"{v['cantidad']:g}", dinero(v["costo"]), dinero(v["precio"]), v["origen"],
+                dinero(v["valor"]), dinero(v["no_realizada"]), porcentaje(v["rent"]),
+                porcentaje(v["tasa"]), v["vencimiento"].isoformat() if v["vencimiento"] else "-",
+                "-" if v["dias"] is None else v["dias"]))
+
+        self._actualizar_resumen()

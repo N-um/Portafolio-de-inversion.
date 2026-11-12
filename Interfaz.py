@@ -1,0 +1,397 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import date
+
+from activo import Activo
+from operacion import Operacion
+from pago import Pago
+from portafolio import Portafolio
+
+AZUL = "#1F3A5F"
+FONDO = "#F3F5F9"
+BORDE = "#D0D6E0"
+VERDE = "#1B7F3B"
+ROJO = "#C0392B"
+COLOR_FIJA = "#2E86AB"
+COLOR_VARIABLE = "#F18F01"
+
+def dinero(x):
+    return f"${x:,.0f}" if x >= 0 else f"-${-x:,.0f}"
+
+
+def porcentaje(x):
+    return "N/A" if x is None else f"{x * 100:,.2f}%"
+
+
+def color_signo(x):
+    return VERDE if x is not None and x >= 0 else ROJO
+
+
+class Interfaz:
+    """Ventana principal con 4 pestañas: Resumen, Operaciones, Dividendos e intereses y Valoración."""
+
+    def __init__(self, portafolio: Portafolio):
+        self.portafolio = portafolio
+        self.activos = Activo.catalogo()
+        self.nombres = [a.nombre for a in self.activos]
+        self.ops_en_tabla = {}    # id de fila -> Operacion
+        self.pagos_en_tabla = {}  # id de fila -> Pago
+
+        self.root = tk.Tk()
+        self.root.title("Seguimiento de Portafolio de Inversión")
+        self.root.geometry("1080x790")
+        self.root.configure(bg=FONDO)
+        self._estilos()
+
+        encabezado = tk.Frame(self.root, bg=AZUL)
+        encabezado.pack(fill="x")
+        tk.Label(encabezado, text="Seguimiento de Portafolio de Inversión", bg=AZUL, fg="white",
+                 font=("Segoe UI", 16, "bold")).pack(side="left", padx=16, pady=12)
+        self.lbl_fecha = tk.Label(encabezado, text="", bg=AZUL, fg="#BFD0E8", font=("Segoe UI", 10))
+        self.lbl_fecha.pack(side="right", padx=16)
+
+        pestanas = ttk.Notebook(self.root)
+        pestanas.pack(fill="both", expand=True, padx=10, pady=10)
+        self.tab_resumen = tk.Frame(pestanas, bg=FONDO)
+        self.tab_ops = tk.Frame(pestanas, bg=FONDO)
+        self.tab_pagos = tk.Frame(pestanas, bg=FONDO)
+        self.tab_valor = tk.Frame(pestanas, bg=FONDO)
+        pestanas.add(self.tab_resumen, text="  Resumen  ")
+        pestanas.add(self.tab_ops, text="  Operaciones  ")
+        pestanas.add(self.tab_pagos, text="  Dividendos e intereses  ")
+        pestanas.add(self.tab_valor, text="  Valoración  ")
+
+        self._armar_resumen()
+        self._armar_operaciones()
+        self._armar_pagos()
+        self._armar_valoracion()
+        self.actualizar()
+        self.root.update_idletasks()
+        self.root.lift()
+
+    def ejecutar(self):
+        self.root.after(200, self.root.update)  # fuerza el redibujado en macOS
+        self.root.mainloop()
+
+    # ---------- Utilidades de diseño ----------
+    def _estilos(self):
+        estilo = ttk.Style()
+        estilo.theme_use("clam")
+        estilo.configure("Treeview", rowheight=24, font=("Segoe UI", 10))
+        estilo.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"),
+                         background=AZUL, foreground="white")
+        estilo.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=(10, 5))
+
+    def _tabla(self, padre, columnas, anchos, alto=8):
+        marco = tk.Frame(padre, bg=FONDO)
+        tabla = ttk.Treeview(marco, columns=columnas, show="headings", height=alto)
+        for col, ancho in zip(columnas, anchos):
+            tabla.heading(col, text=col)
+            tabla.column(col, width=ancho, anchor="center")
+        tabla.tag_configure("pos", foreground=VERDE)
+        tabla.tag_configure("neg", foreground=ROJO)
+        barra = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
+        tabla.configure(yscrollcommand=barra.set)
+        tabla.pack(side="left", fill="both", expand=True)
+        barra.pack(side="right", fill="y")
+        return marco, tabla
+
+    def _campo(self, padre, texto, columna, valores=None, valor="", ancho=14):
+        tk.Label(padre, text=texto, bg=FONDO, font=("Segoe UI", 9)).grid(
+            row=0, column=columna, sticky="w", padx=4)
+        if valores:
+            widget = ttk.Combobox(padre, values=valores, state="readonly", width=ancho - 2)
+            widget.set(valores[0])
+        else:
+            widget = ttk.Entry(padre, width=ancho)
+            widget.insert(0, valor)
+        widget.grid(row=1, column=columna, padx=4, pady=(0, 6))
+        return widget
+
+    def _tarjeta(self, padre, titulo):
+        marco = tk.Frame(padre, bg="white", highlightbackground=BORDE, highlightthickness=1)
+        tk.Label(marco, text=titulo, bg="white", fg=AZUL, font=("Segoe UI", 11, "bold")).pack(pady=(8, 2))
+        return marco
+
+    # ---------- Pestaña Resumen ----------
+    def _armar_resumen(self):
+        self.kpis = {}
+        fila = tk.Frame(self.tab_resumen, bg=FONDO)
+        fila.pack(fill="x", padx=6, pady=(10, 4))
+        for i, (clave, titulo) in enumerate([("invertido", "Total invertido"),
+                                             ("valor_actual", "Valor actual"),
+                                             ("ganancia", "Ganancia / pérdida"),
+                                             ("rent_acumulada", "Rentab. acumulada"),
+                                             ("rent_ea", "Rentab. efectiva anual"),
+                                             ("comisiones", "Comisiones pagadas")]):
+            tarjeta = tk.Frame(fila, bg="white", highlightbackground=BORDE, highlightthickness=1)
+            tarjeta.grid(row=0, column=i, padx=4, sticky="nsew")
+            fila.columnconfigure(i, weight=1)
+            tk.Label(tarjeta, text=titulo, bg="white", fg="#666", font=("Segoe UI", 9)).pack(pady=(8, 0))
+            valor = tk.Label(tarjeta, text="-", bg="white", fg=AZUL, font=("Segoe UI", 14, "bold"))
+            valor.pack(pady=(0, 8), padx=6)
+            self.kpis[clave] = valor
+
+        medio = tk.Frame(self.tab_resumen, bg=FONDO)
+        medio.pack(fill="x", padx=6, pady=4)
+
+        izq = self._tarjeta(medio, "Renta fija vs. renta variable")
+        izq.pack(side="left", fill="y", padx=4)
+        self.canvas_torta = tk.Canvas(izq, width=250, height=170, bg="white", highlightthickness=0)
+        self.canvas_torta.pack(padx=8)
+        self.lbl_leyenda = tk.Label(izq, text="", bg="white", font=("Segoe UI", 9), justify="left")
+        self.lbl_leyenda.pack(pady=(0, 8))
+
+        centro = self._tarjeta(medio, "Distribución por activo")
+        centro.pack(side="left", fill="both", expand=True, padx=4)
+        self.canvas_barras = tk.Canvas(centro, width=330, height=200, bg="white", highlightthickness=0)
+        self.canvas_barras.pack(padx=8, pady=(0, 8))
+
+        der = self._tarjeta(medio, "Detalle financiero")
+        der.pack(side="left", fill="y", padx=4)
+        self.lbl_detalle = tk.Label(der, text="", bg="white", font=("Segoe UI", 10), justify="left")
+        self.lbl_detalle.pack(padx=14, pady=(4, 8), anchor="w")
+
+        tk.Label(self.tab_resumen, text="Rendimiento por activo", bg=FONDO, fg=AZUL,
+                 font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(6, 0))
+        marco, self.tabla_resumen = self._tabla(
+            self.tab_resumen,
+            ("Activo", "Tipo", "Cantidad", "Valor actual", "Peso", "Total invertido",
+             "Dividendos / intereses", "Ganancia", "Rent. acum.", "Rent. E.A."),
+            (100, 70, 70, 110, 60, 110, 130, 110, 85, 85), alto=6)
+        marco.pack(fill="both", expand=True, padx=10, pady=(2, 8))
+
+    def _actualizar_resumen(self):
+        r = self.portafolio.resumen()
+        self.lbl_fecha.config(text=f"Valoración al {date.today():%d/%m/%Y}")
+        self.kpis["invertido"].config(text=dinero(r["invertido"]))
+        self.kpis["valor_actual"].config(text=dinero(r["valor_actual"]))
+        self.kpis["ganancia"].config(text=dinero(r["ganancia"]), fg=color_signo(r["ganancia"]))
+        self.kpis["rent_acumulada"].config(text=porcentaje(r["rent_acumulada"]),
+                                           fg=color_signo(r["rent_acumulada"]))
+        self.kpis["rent_ea"].config(text=porcentaje(r["rent_ea"]), fg=color_signo(r["rent_ea"]))
+        self.kpis["comisiones"].config(text=dinero(r["comisiones"]))
+
+        self.lbl_detalle.config(text=(
+            f"Ganancia no realizada:   {dinero(r['no_realizada'])}\n"
+            f"   (valor actual − costo de lo que aún tengo)\n"
+            f"Ganancia realizada:   {dinero(r['realizada'])}\n"
+            f"   (ventas hechas + dividendos e intereses)\n\n"
+            f"Dividendos e intereses:   {dinero(r['ingresos'])}\n"
+            f"Ventas netas recibidas:   {dinero(r['ventas'])}\n"
+            f"Comisiones pagadas:   {dinero(r['comisiones'])}"))
+
+        self._dibujar_torta(r)
+        self._dibujar_barras(r)
+
+        self.tabla_resumen.delete(*self.tabla_resumen.get_children())
+        for nombre, a in r["por_activo"].items():
+            tag = "pos" if a["ganancia"] >= 0 else "neg"
+            self.tabla_resumen.insert("", "end", tags=(tag,), values=(
+                nombre, a["tipo"], f"{a['cantidad']:g}", dinero(a["valor"]),
+                f"{a['peso'] * 100:.1f}%", dinero(a["compras"]), dinero(a["pagos"]),
+                dinero(a["ganancia"]), porcentaje(a["rent"]), porcentaje(a["rent_ea"])))
+
+    def _dibujar_torta(self, r):
+        c = self.canvas_torta
+        c.delete("all")
+        total = r["renta_fija"] + r["renta_variable"]
+        if total <= 0:
+            c.create_text(125, 85, text="Sin inversiones", fill="#999")
+            self.lbl_leyenda.config(text="")
+            return
+        caja = (65, 10, 185, 130)
+        pct_fija = r["renta_fija"] / total
+        if pct_fija >= 0.9999 or pct_fija <= 0.0001:
+            c.create_oval(*caja, fill=COLOR_FIJA if pct_fija > 0.5 else COLOR_VARIABLE, outline="white")
+        else:
+            c.create_arc(*caja, start=90, extent=-360 * pct_fija, fill=COLOR_FIJA, outline="white")
+            c.create_arc(*caja, start=90 - 360 * pct_fija, extent=-360 * (1 - pct_fija),
+                         fill=COLOR_VARIABLE, outline="white")
+        c.create_rectangle(10, 142, 22, 154, fill=COLOR_FIJA, outline="")
+        c.create_text(28, 148, anchor="w", font=("Segoe UI", 9),
+                      text=f"Renta fija  {pct_fija * 100:.1f}%  ({dinero(r['renta_fija'])})")
+        c.create_rectangle(10, 158, 22, 170, fill=COLOR_VARIABLE, outline="")
+        c.create_text(28, 164, anchor="w", font=("Segoe UI", 9),
+                      text=f"Renta variable  {(1 - pct_fija) * 100:.1f}%  ({dinero(r['renta_variable'])})")
+        self.lbl_leyenda.config(text="")
+
+    def _dibujar_barras(self, r):
+        c = self.canvas_barras
+        c.delete("all")
+        activos = [(n, a) for n, a in r["por_activo"].items() if a["valor"] > 0]
+        if not activos:
+            c.create_text(165, 100, text="Sin inversiones", fill="#999")
+            return
+        activos.sort(key=lambda x: -x[1]["valor"])
+        mayor = activos[0][1]["peso"]
+        for i, (nombre, a) in enumerate(activos):
+            y = 10 + i * 32
+            color = Activo.buscar(nombre).color
+            c.create_text(4, y + 10, anchor="w", text=nombre, font=("Segoe UI", 9))
+            largo = 150 * a["peso"] / mayor if mayor > 0 else 0
+            c.create_rectangle(95, y, 95 + largo, y + 20, fill=color, outline="")
+            c.create_text(100 + largo, y + 10, anchor="w", font=("Segoe UI", 9, "bold"),
+                          text=f"{a['peso'] * 100:.1f}%")
+
+    # ---------- Pestaña Operaciones ----------
+    def _armar_operaciones(self):
+        form = tk.Frame(self.tab_ops, bg=FONDO)
+        form.pack(fill="x", padx=10, pady=(10, 0))
+        self.op_fecha = self._campo(form, "Fecha (AAAA-MM-DD)", 0, valor=date.today().isoformat(), ancho=16)
+        self.op_activo = self._campo(form, "Activo", 1, self.nombres, ancho=16)
+        self.op_activo.bind("<<ComboboxSelected>>", self._al_elegir_activo)
+        self.op_tipo = self._campo(form, "Operación", 2, Operacion.TIPOS_OPERACION, ancho=10)
+        self.op_cantidad = self._campo(form, "Cantidad", 3, valor="1", ancho=8)
+        self.op_precio = self._campo(form, "Precio / valor unitario", 4, ancho=18)
+        self.op_comision = self._campo(form, "Comisión del bróker", 5, valor="0", ancho=16)
+
+        form2 = tk.Frame(self.tab_ops, bg=FONDO)
+        form2.pack(fill="x", padx=10)
+        self.op_tasa = self._campo(form2, "Tasa E.A. % (CDT)", 0, valor="0", ancho=16)
+        self.op_venc = self._campo(form2, "Vencimiento (CDT)", 1, ancho=16)
+        self.lbl_info = tk.Label(form2, text="", bg=FONDO, fg="#555", font=("Segoe UI", 9), justify="left")
+        self.lbl_info.grid(row=1, column=2, padx=10, sticky="w")
+        ttk.Button(form2, text="Registrar operación", command=self._registrar_operacion
+                   ).grid(row=1, column=3, padx=10, pady=(0, 6))
+
+        marco, self.tabla_ops = self._tabla(
+            self.tab_ops,
+            ("Fecha", "Activo", "Tipo", "Operación", "Cantidad", "Precio", "Comisión", "Flujo de caja"),
+            (90, 120, 70, 90, 80, 110, 100, 130), alto=14)
+        marco.pack(fill="both", expand=True, padx=10, pady=8)
+        ttk.Button(self.tab_ops, text="Eliminar operación seleccionada",
+                   command=self._eliminar_operacion).pack(anchor="e", padx=10, pady=(0, 10))
+        self._al_elegir_activo()
+
+    def _al_elegir_activo(self, _evento=None):
+        activo = Activo.buscar(self.op_activo.get())
+        self.lbl_info.config(text=f"{activo.ticker} · {activo.tipo} · Sector: {activo.sector}\n"
+                                  + ("Precio = valor del título; cantidad = 1 si es un solo CDT."
+                                     if activo.es_renta_fija else "Precio = valor de la acción."))
+        for campo, vacio in ((self.op_tasa, "0"), (self.op_venc, "")):
+            campo.state(["!disabled"])
+            if not activo.es_renta_fija:  # las acciones no tienen tasa ni vencimiento
+                campo.delete(0, "end")
+                campo.insert(0, vacio)
+                campo.state(["disabled"])
+
+    def _registrar_operacion(self):
+        try:
+            activo = Activo.buscar(self.op_activo.get())
+            venc = self.op_venc.get().strip()
+            op = Operacion(
+                date.fromisoformat(self.op_fecha.get().strip()), activo.tipo, activo.nombre,
+                self.op_tipo.get(), float(self.op_cantidad.get()), float(self.op_precio.get()),
+                float(self.op_comision.get() or 0), float(self.op_tasa.get() or 0) / 100,
+                date.fromisoformat(venc) if venc else None)
+            self.portafolio.agregar_operacion(op)
+        except ValueError as e:
+            messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
+            return
+        self.op_precio.delete(0, "end")
+        self.actualizar()
+
+    def _eliminar_operacion(self):
+        seleccion = self.tabla_ops.selection()
+        if not seleccion:
+            messagebox.showinfo("Operaciones", "Primero selecciona una operación de la tabla.")
+            return
+        if messagebox.askyesno("Eliminar", "¿Eliminar la operación seleccionada?"):
+            self.portafolio.eliminar_operacion(self.ops_en_tabla[seleccion[0]])
+            self.actualizar()
+
+    # ---------- Pestaña Pagos ----------
+    def _armar_pagos(self):
+        form = tk.Frame(self.tab_pagos, bg=FONDO)
+        form.pack(fill="x", padx=10, pady=10)
+        self.pg_fecha = self._campo(form, "Fecha (AAAA-MM-DD)", 0, valor=date.today().isoformat(), ancho=16)
+        self.pg_activo = self._campo(form, "Activo", 1, self.nombres, ancho=16)
+        self.pg_tipo = self._campo(form, "Tipo de pago", 2, Pago.TIPOS)
+        self.pg_monto = self._campo(form, "Monto recibido", 3, ancho=16)
+        ttk.Button(form, text="Registrar pago", command=self._registrar_pago
+                   ).grid(row=1, column=4, padx=10, pady=(0, 6))
+
+        tk.Label(self.tab_pagos, bg=FONDO, fg="#555", font=("Segoe UI", 9), justify="left",
+                 text=("Dividendo: acciones. Interés: CDT (se descuenta del valor causado). Capital: devolución de "
+                       "parte del dinero invertido (reduce el valor del título).")).pack(anchor="w", padx=14)
+        marco, self.tabla_pagos = self._tabla(
+            self.tab_pagos, ("Fecha", "Activo", "Tipo", "Monto"), (110, 200, 110, 140), alto=14)
+        marco.pack(fill="both", expand=True, padx=10, pady=8)
+        ttk.Button(self.tab_pagos, text="Eliminar pago seleccionado",
+                   command=self._eliminar_pago).pack(anchor="e", padx=10, pady=(0, 10))
+
+    def _registrar_pago(self):
+        try:
+            pago = Pago(date.fromisoformat(self.pg_fecha.get().strip()), self.pg_activo.get(),
+                        self.pg_tipo.get(), float(self.pg_monto.get()))
+            self.portafolio.agregar_pago(pago)
+        except ValueError as e:
+            messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
+            return
+        self.pg_monto.delete(0, "end")
+        self.actualizar()
+
+    def _eliminar_pago(self):
+        seleccion = self.tabla_pagos.selection()
+        if not seleccion:
+            messagebox.showinfo("Pagos", "Primero selecciona un pago de la tabla.")
+            return
+        if messagebox.askyesno("Eliminar", "¿Eliminar el pago seleccionado?"):
+            self.portafolio.eliminar_pago(self.pagos_en_tabla[seleccion[0]])
+            self.actualizar()
+
+    # ---------- Pestaña Valoración ----------
+    def _armar_valoracion(self):
+        tk.Label(self.tab_valor, bg=FONDO, justify="left", font=("Segoe UI", 9), fg="#555",
+                 text=("Selecciona un activo y escribe su precio de mercado actual. Si no lo haces, las acciones se "
+                       "valoran con su último precio y el CDT con su tasa E.A. (intereses causados hasta hoy).")
+                 ).pack(anchor="w", padx=10, pady=(10, 4))
+        marco, self.tabla_val = self._tabla(
+            self.tab_valor,
+            ("Activo", "Cantidad", "Costo", "Precio actual", "Origen", "Valor actual",
+             "Ganancia no realizada", "Rent. %", "Tasa E.A.", "Vence", "Días"),
+            (95, 65, 105, 100, 80, 110, 130, 70, 70, 90, 55), alto=10)
+        marco.pack(fill="both", expand=True, padx=10, pady=4)
+
+        form = tk.Frame(self.tab_valor, bg=FONDO)
+        form.pack(fill="x", padx=10, pady=10)
+        self.val_precio = self._campo(form, "Nuevo precio de mercado", 0, ancho=22)
+        ttk.Button(form, text="Actualizar precio", command=self._actualizar_precio
+                   ).grid(row=1, column=1, padx=10, pady=(0, 6))
+        ttk.Button(form, text="Volver a valoración automática", command=self._quitar_precio
+                   ).grid(row=1, column=2, padx=4, pady=(0, 6))
+
+    def _activo_seleccionado(self):
+        seleccion = self.tabla_val.selection()
+        if not seleccion:
+            messagebox.showinfo("Valoración", "Primero selecciona un activo de la tabla.")
+            return None
+        return str(self.tabla_val.item(seleccion[0])["values"][0])
+
+    def _actualizar_precio(self):
+        nombre = self._activo_seleccionado()
+        if nombre is None:
+            return
+        try:
+            precio = float(self.val_precio.get())
+            if precio < 0:
+                raise ValueError("El precio no puede ser negativo.")
+        except ValueError as e:
+            messagebox.showerror("Dato inválido", f"Revisa el precio.\n\n{e}")
+            return
+        self.portafolio.actualizar_precio(nombre, precio)
+        self.val_precio.delete(0, "end")
+        self.actualizar()
+
+    def _quitar_precio(self):
+        nombre = self._activo_seleccionado()
+        if nombre is not None:
+            self.portafolio.quitar_precio_manual(nombre)
+            self.actualizar()
+
+    # ---------- Refrescar todo ----------
+    def actualizar(self):
+        for tabla in (self.tabla_ops, self.tabla_pagos, self.tabla_val):
+            tabla.delete(*tabla.get_children())
+        self.ops_en_tabla, self.pagos_en_tabla = {}, {}

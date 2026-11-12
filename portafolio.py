@@ -1,8 +1,9 @@
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 
 from activo import Activo
+from mercado import Mercado
 from operacion import Operacion
 from pago import Pago
 from posicion import Posicion
@@ -10,18 +11,18 @@ from rentabilidad import Rentabilidad
 
 
 class Portafolio:
-    """Guarda las operaciones, los pagos y los precios manuales, y calcula los resultados.
+    """Guarda las operaciones y los pagos, tiene el Mercado (precios y TRM) y calcula los resultados.
 
     Todo se calcula a la "fecha de corte" (por defecto, hoy). Lo registrado con fecha
     posterior a la fecha de corte no se tiene en cuenta, igual que en el Excel de control.
     """
 
-    def __init__(self, ruta=None, fecha_corte=None):
+    def __init__(self, ruta=None, fecha_corte=None, mercado=None):
         self.ruta = ruta                  # archivo JSON donde se guardan los datos (opcional)
         self._fecha_corte = fecha_corte   # None = hoy
         self.operaciones = []
         self.pagos = []
-        self.precios_manuales = {}        # nombre del activo -> precio de mercado por unidad
+        self.mercado = mercado or Mercado()
 
     @property
     def fecha_corte(self):
@@ -32,6 +33,8 @@ class Portafolio:
         activo = Activo.buscar(op.activo)
         if op.tipo_activo != activo.tipo:
             raise ValueError(f"{activo.nombre} es de {activo.tipo}, no de {op.tipo_activo}.")
+        if activo.moneda == "USD":
+            self.mercado.trm(op.fecha)  # sin TRM de esa fecha no se puede pasar a pesos
         self._validar_cantidades(self.operaciones + [op], activo.nombre)
         self.operaciones.append(op)
         self.guardar()
@@ -51,6 +54,8 @@ class Portafolio:
         compras = [o.fecha for o in self.operaciones if o.activo == pago.activo and o.es_compra]
         if not compras or pago.fecha < min(compras):
             raise ValueError("No hay una compra de ese activo antes de la fecha del pago.")
+        if activo.moneda == "USD":
+            self.mercado.trm(pago.fecha)
         self.pagos.append(pago)
         self.guardar()
 
@@ -59,13 +64,31 @@ class Portafolio:
         self.guardar()
 
     def actualizar_precio(self, nombre, precio):
-        Activo.buscar(nombre)
-        self.precios_manuales[nombre] = float(precio)
+        """Precio de mercado escrito a mano (moneda del activo), válido desde la fecha de corte."""
+        activo = Activo.buscar(nombre)
+        if activo.es_renta_fija:
+            raise ValueError("La renta fija se valora con su tasa E.A.; el precio manual es solo para acciones.")
+        self.mercado.agregar(activo.ticker, self.fecha_corte, precio, Mercado.MANUAL)
         self.guardar()
 
     def quitar_precio_manual(self, nombre):
-        self.precios_manuales.pop(nombre, None)
+        self.mercado.quitar_manuales(Activo.buscar(nombre).ticker)
         self.guardar()
+
+    def actualizar_mercado(self):
+        """Descarga la TRM y los cierres de las acciones desde la primera operación hasta la fecha de corte."""
+        if not self.operaciones:
+            raise ValueError("Primero registre alguna operación.")
+        inicio = min(o.fecha for o in self.operaciones) - timedelta(days=10)
+        fin = self.fecha_corte
+        fuente_trm = self.mercado.descargar_trm(inicio, fin)
+        tickers = [a.ticker for a in Activo.catalogo() if not a.es_renta_fija]
+        faltan = self.mercado.descargar_precios(tickers, inicio, fin)
+        self.guardar()
+        mensaje = f"{fuente_trm} y precios de yfinance del {inicio} al {fin}."
+        if faltan:
+            mensaje += f"\nSin datos para: {', '.join(faltan)} (se usa su último precio de operación)."
+        return mensaje
 
     @staticmethod
     def _validar_cantidades(operaciones, nombre):
@@ -88,17 +111,42 @@ class Portafolio:
     def pagos_ordenados(self):
         return self._en_orden(self.pagos)
 
-    def posiciones(self):
-        """Una Posicion por cada activo del catálogo que tenga operaciones hasta la fecha de corte."""
-        corte = self.fecha_corte
+    def posiciones(self, fecha=None):
+        """Una Posicion por cada activo del catálogo que tenga operaciones hasta la fecha dada
+        (por defecto, la fecha de corte)."""
+        corte = fecha or self.fecha_corte
         resultado = []
         for activo in Activo.catalogo():
             ops = [o for o in self.operaciones_ordenadas() if o.activo == activo.nombre and o.fecha <= corte]
             if not ops:
                 continue
             pagos = [p for p in self.pagos_ordenados() if p.activo == activo.nombre and p.fecha <= corte]
-            resultado.append(Posicion(activo, ops, pagos, corte, self.precios_manuales.get(activo.nombre)))
+            resultado.append(Posicion(activo, ops, pagos, corte, self.mercado))
         return resultado
+
+    def valor_diario(self, inicio, fin):
+        """Valor del portafolio en pesos para cada día del rango (sin pasar de la fecha de corte).
+
+        Cada día se valora como si ese día fuera la fecha de corte: cantidades a esa fecha,
+        último cierre conocido de cada acción, TRM de ese día y renta fija causada a su tasa.
+        """
+        fin = min(fin, self.fecha_corte)
+        if inicio > fin:
+            raise ValueError("La fecha inicial debe ser anterior a la final (y a la fecha de corte).")
+        dias = []
+        dia = inicio
+        while dia <= fin:
+            posiciones = self.posiciones(dia)
+            dato_trm = self.mercado.dato(Mercado.TRM, dia)
+            dias.append({
+                "fecha": dia,
+                "trm": dato_trm[1] if dato_trm else None,
+                "por_activo": {p.activo.nombre: p.valor for p in posiciones},
+                "renta_variable": sum(p.valor for p in posiciones if not p.activo.es_renta_fija),
+                "renta_fija": sum(p.valor for p in posiciones if p.activo.es_renta_fija),
+                "total": sum(p.valor for p in posiciones)})
+            dia += timedelta(days=1)
+        return dias
 
     def resumen(self):
         posiciones = self.posiciones()
@@ -115,8 +163,10 @@ class Portafolio:
                 "compras": p.compras, "pagos": p.ingresos, "ganancia": p.ganancia,
                 "rent": p.rent_acumulada, "rent_ea": p.rent_ea}
 
+        dato_trm = self.mercado.dato(Mercado.TRM, self.fecha_corte)
         return {
             "fecha_corte": self.fecha_corte,
+            "trm": dato_trm[1] if dato_trm else None,
             "invertido": invertido,
             "ventas": sum(p.ventas for p in posiciones),
             "ingresos": sum(p.ingresos for p in posiciones),
@@ -150,21 +200,22 @@ class Portafolio:
         if not self.ruta:
             return
         datos = {"operaciones": [o.a_dict() for o in self.operaciones],
-                 "pagos": [p.a_dict() for p in self.pagos],
-                 "precios_manuales": self.precios_manuales}
+                 "pagos": [p.a_dict() for p in self.pagos]}
         carpeta = os.path.dirname(self.ruta)
         if carpeta:
             os.makedirs(carpeta, exist_ok=True)
         with open(self.ruta, "w", encoding="utf-8") as archivo:
             json.dump(datos, archivo, ensure_ascii=False, indent=2)
+        self.mercado.guardar()
 
     @staticmethod
     def cargar(ruta, fecha_corte=None):
-        portafolio = Portafolio(ruta, fecha_corte)
+        """Lee las operaciones y pagos del JSON y el mercado del CSV 'mercado.csv' de la misma carpeta."""
+        mercado = Mercado.cargar(os.path.join(os.path.dirname(ruta), "mercado.csv"))
+        portafolio = Portafolio(ruta, fecha_corte, mercado)
         if os.path.exists(ruta):
             with open(ruta, encoding="utf-8") as archivo:
                 datos = json.load(archivo)
             portafolio.operaciones = [Operacion.desde_dict(d) for d in datos.get("operaciones", [])]
             portafolio.pagos = [Pago.desde_dict(d) for d in datos.get("pagos", [])]
-            portafolio.precios_manuales = {k: float(v) for k, v in datos.get("precios_manuales", {}).items()}
         return portafolio

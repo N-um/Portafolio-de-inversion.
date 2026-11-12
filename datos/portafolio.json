@@ -6,8 +6,7 @@
       "activo": "Nike",
       "tipo_operacion": "Compra",
       "cantidad": 20.0,
-      "precio": 577660.0,
-      "comision": 2311.0,
+      "precio": 127.0,
       "tasa": 0.0,
       "vencimiento": null
     },
@@ -17,8 +16,7 @@
       "activo": "Nike",
       "tipo_operacion": "Venta",
       "cantidad": 20.0,
-      "precio": 436850.0,
-      "comision": 1747.0,
+      "precio": 110.0,
       "tasa": 0.0,
       "vencimiento": null
     },
@@ -29,18 +27,16 @@
       "tipo_operacion": "Compra",
       "cantidad": 1000.0,
       "precio": 2450.0,
-      "comision": 7350.0,
       "tasa": 0.0,
       "vencimiento": null
     },
     {
       "fecha": "2024-06-04",
       "tipo_activo": "Renta variable",
-      "activo": "Bancolombia",
+      "activo": "Grupo Cibest",
       "tipo_operacion": "Compra",
       "cantidad": 100.0,
-      "precio": 34500.0,
-      "comision": 10350.0,
+      "precio": 32.5,
       "tasa": 0.0,
       "vencimiento": null
     },
@@ -51,7 +47,6 @@
       "tipo_operacion": "Compra",
       "cantidad": 5.0,
       "precio": 1000000.0,
-      "comision": 5000.0,
       "tasa": 0.102,
       "vencimiento": "2029-09-10"
     },
@@ -62,7 +57,6 @@
       "tipo_operacion": "Compra",
       "cantidad": 10.0,
       "precio": 960000.0,
-      "comision": 9600.0,
       "tasa": 0.112,
       "vencimiento": "2031-03-26"
     },
@@ -73,7 +67,6 @@
       "tipo_operacion": "Compra",
       "cantidad": 1.0,
       "precio": 5000000.0,
-      "comision": 0.0,
       "tasa": 0.105,
       "vencimiento": "2025-08-30"
     },
@@ -84,7 +77,6 @@
       "tipo_operacion": "Compra",
       "cantidad": 500.0,
       "precio": 2100.0,
-      "comision": 3150.0,
       "tasa": 0.0,
       "vencimiento": null
     },
@@ -95,7 +87,6 @@
       "tipo_operacion": "Venta",
       "cantidad": 300.0,
       "precio": 2300.0,
-      "comision": 2070.0,
       "tasa": 0.0,
       "vencimiento": null
     },
@@ -106,7 +97,6 @@
       "tipo_operacion": "Compra",
       "cantidad": 1.0,
       "precio": 10000000.0,
-      "comision": 0.0,
       "tasa": 0.098,
       "vencimiento": "2027-02-11"
     },
@@ -117,7 +107,6 @@
       "tipo_operacion": "Venta",
       "cantidad": 2.0,
       "precio": 1015000.0,
-      "comision": 2030.0,
       "tasa": 0.0,
       "vencimiento": null
     }
@@ -127,13 +116,13 @@
       "fecha": "2023-04-02",
       "activo": "Nike",
       "tipo": "Dividendo",
-      "monto": 31620.0
+      "monto": 6.8
     },
     {
       "fecha": "2023-07-04",
       "activo": "Nike",
       "tipo": "Dividendo",
-      "monto": 28424.0
+      "monto": 6.8
     },
     {
       "fecha": "2024-04-24",
@@ -142,16 +131,16 @@
       "monto": 312000.0
     },
     {
-      "fecha": "2024-07-01",
-      "activo": "Bancolombia",
+      "fecha": "2024-07-12",
+      "activo": "Grupo Cibest",
       "tipo": "Dividendo",
-      "monto": 93600.0
+      "monto": 88.0
     },
     {
-      "fecha": "2024-10-01",
-      "activo": "Bancolombia",
+      "fecha": "2024-10-11",
+      "activo": "Grupo Cibest",
       "tipo": "Dividendo",
-      "monto": 93600.0
+      "monto": 88.0
     },
     {
       "fecha": "2025-03-10",
@@ -166,10 +155,10 @@
       "monto": 700000.0
     },
     {
-      "fecha": "2025-04-01",
-      "activo": "Bancolombia",
+      "fecha": "2025-04-11",
+      "activo": "Grupo Cibest",
       "tipo": "Dividendo",
-      "monto": 101400.0
+      "monto": 92.0
     },
     {
       "fecha": "2025-04-23",
@@ -196,10 +185,10 @@
       "monto": 248809.0
     },
     {
-      "fecha": "2025-10-01",
-      "activo": "Bancolombia",
+      "fecha": "2025-10-10",
+      "activo": "Grupo Cibest",
       "tipo": "Dividendo",
-      "monto": 101400.0
+      "monto": 92.0
     },
     {
       "fecha": "2026-03-10",
@@ -214,10 +203,10 @@
       "monto": 700000.0
     },
     {
-      "fecha": "2026-04-01",
-      "activo": "Bancolombia",
+      "fecha": "2026-04-10",
+      "activo": "Grupo Cibest",
       "tipo": "Dividendo",
-      "monto": 101400.0
+      "monto": 95.0
     },
     {
       "fecha": "2026-04-22",
@@ -231,9 +220,5 @@
       "tipo": "Interés",
       "monto": 149286.0
     }
-  ],
-  "precios_manuales": {
-    "Ecopetrol": 2120.0,
-    "Bancolombia": 41500.0
-  }
+  ]
 }

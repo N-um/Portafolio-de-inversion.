@@ -2,20 +2,25 @@ from rentabilidad import Rentabilidad
 
 
 class Posicion:
-    """Resultado de un activo a la fecha de corte, calculado con sus operaciones y pagos.
+    """Resultado de un activo en una fecha, calculado con sus operaciones, pagos y el mercado.
 
     Cada propiedad corresponde a una columna de la hoja "Por activo" del Excel de control.
     Las operaciones deben llegar en orden cronológico y solo con fecha <= fecha de corte.
+    Todos los resultados están en pesos (COP): lo que está en dólares se convierte con la
+    TRM del día de cada movimiento, y el valor actual con la TRM de la fecha de corte.
     """
 
-    def __init__(self, activo, operaciones, pagos, fecha_corte, precio_manual=None):
+    def __init__(self, activo, operaciones, pagos, fecha_corte, mercado):
         self.activo = activo
         self.operaciones = operaciones
         self.pagos = pagos
         self.fecha_corte = fecha_corte
-        self.precio_manual = precio_manual
+        self.mercado = mercado
 
-    # ---------- Cantidades y dinero ----------
+    def _a_pesos(self, monto, fecha):
+        return monto if self.activo.moneda == "COP" else monto * self.mercado.trm(fecha)
+
+    # ---------- Cantidades y dinero (COP) ----------
     @property
     def cantidad_comprada(self):
         return sum(o.cantidad for o in self.operaciones if o.es_compra)
@@ -27,26 +32,26 @@ class Posicion:
     @property
     def compras(self):
         """Total invertido: lo pagado en compras, comisiones incluidas."""
-        return sum(-o.flujo_caja for o in self.operaciones if o.es_compra)
+        return sum(-self._a_pesos(o.flujo_caja, o.fecha) for o in self.operaciones if o.es_compra)
 
     @property
     def ventas(self):
         """Ventas netas: lo recibido en ventas, ya descontada la comisión."""
-        return sum(o.flujo_caja for o in self.operaciones if not o.es_compra)
+        return sum(self._a_pesos(o.flujo_caja, o.fecha) for o in self.operaciones if not o.es_compra)
 
     @property
     def comisiones(self):
-        return sum(o.comision for o in self.operaciones)
+        return sum(self._a_pesos(o.comision, o.fecha) for o in self.operaciones)
 
     @property
     def ingresos(self):
         """Dividendos + intereses."""
-        return sum(p.monto for p in self.pagos if p.es_ingreso)
+        return sum(self._a_pesos(p.monto, p.fecha) for p in self.pagos if p.es_ingreso)
 
     @property
     def capital(self):
         """Pagos de capital (devolución del dinero invertido en renta fija)."""
-        return sum(p.monto for p in self.pagos if not p.es_ingreso)
+        return sum(self._a_pesos(p.monto, p.fecha) for p in self.pagos if not p.es_ingreso)
 
     # ---------- Condiciones del título (renta fija) ----------
     def _primera_compra(self):
@@ -69,27 +74,32 @@ class Posicion:
         return max(0, (self.vencimiento - self.fecha_corte).days)
 
     # ---------- Valoración ----------
+    def _precio_mercado(self):
+        """(precio en la moneda del activo, origen) para una acción."""
+        dato = self.mercado.dato(self.activo.ticker, self.fecha_corte)
+        if dato is not None:
+            return dato[1], dato[2]                       # origen = fuente (yfinance, Manual...)
+        return self.operaciones[-1].precio, "Último precio"
+
     @property
     def origen(self):
         if self.cantidad <= 0:
             return "Sin posición"
-        if self.precio_manual is not None:
-            return "Manual"
         if not self.activo.es_renta_fija:
-            return "Último precio"
+            return self._precio_mercado()[1]
         if self.fecha_corte >= self.vencimiento:
             return "Vencido"
         return "Tasa E.A."
 
     @property
     def valor(self):
-        origen = self.origen
-        if origen in ("Sin posición", "Vencido"):
+        if self.cantidad <= 0:
             return 0.0
-        if origen == "Manual":
-            return self.precio_manual * self.cantidad
-        if origen == "Último precio":
-            return self.operaciones[-1].precio * self.cantidad
+        if not self.activo.es_renta_fija:
+            precio = self._precio_mercado()[0]
+            return self._a_pesos(precio * self.cantidad, self.fecha_corte)
+        if self.fecha_corte >= self.vencimiento:
+            return 0.0
         return max(0.0, self._valor_causado())
 
     def _valor_causado(self):
@@ -102,7 +112,7 @@ class Posicion:
         fin = min(self.fecha_corte, self.vencimiento)
 
         def crecer(monto, fecha):
-            return monto * (1 + self.tasa) ** ((fin - fecha).days / 365)
+            return self._a_pesos(monto, fecha) * (1 + self.tasa) ** ((fin - fecha).days / 365)
 
         total = 0.0
         for o in self.operaciones:
@@ -113,13 +123,15 @@ class Posicion:
 
     @property
     def precio_actual(self):
+        """Precio por unidad en pesos."""
         return self.valor / self.cantidad if self.cantidad > 0 else 0.0
 
-    # ---------- Resultados ----------
+    # ---------- Resultados (COP) ----------
     @property
     def costo_remanente(self):
-        """Costo de lo que aún se tiene: cantidad x costo promedio de compra, menos capital devuelto."""
-        if self.cantidad_comprada == 0:
+        """Costo de lo que aún se tiene: cantidad x costo promedio de compra, menos capital devuelto.
+        Un título vencido ya no se tiene: su costo es 0 y todo su resultado queda como realizado."""
+        if self.cantidad_comprada == 0 or self.origen == "Vencido":
             return 0.0
         return self.cantidad * self.compras / self.cantidad_comprada - self.capital
 
@@ -141,9 +153,9 @@ class Posicion:
         return Rentabilidad.acumulada(self.ganancia, self.compras)
 
     def flujos(self):
-        """Flujos de caja para la TIR: compras (-), ventas y pagos (+) y el valor actual al corte (+)."""
-        flujos = [(o.fecha, o.flujo_caja) for o in self.operaciones]
-        flujos += [(p.fecha, p.monto) for p in self.pagos]
+        """Flujos de caja en pesos para la TIR: compras (-), ventas y pagos (+) y el valor actual (+)."""
+        flujos = [(o.fecha, self._a_pesos(o.flujo_caja, o.fecha)) for o in self.operaciones]
+        flujos += [(p.fecha, self._a_pesos(p.monto, p.fecha)) for p in self.pagos]
         flujos.append((self.fecha_corte, self.valor))
         return flujos
 

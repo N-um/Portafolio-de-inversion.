@@ -1,8 +1,10 @@
+import csv
 import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import date
+from tkinter import ttk, messagebox, filedialog
+from datetime import date, timedelta
 
 from activo import Activo
+from mercado import Mercado
 from operacion import Operacion
 from pago import Pago
 from portafolio import Portafolio
@@ -19,6 +21,11 @@ def dinero(x):
     return f"${x:,.0f}" if x >= 0 else f"-${-x:,.0f}"
 
 
+def numero(x):
+    """Monto en la moneda del activo (con centavos, para que se vean los dólares)."""
+    return f"{x:,.2f}" if x >= 0 else f"-{-x:,.2f}"
+
+
 def porcentaje(x):
     return "N/A" if x is None else f"{x * 100:,.2f}%"
 
@@ -28,7 +35,7 @@ def color_signo(x):
 
 
 class Interfaz:
-    """Ventana principal con 4 pestañas: Resumen, Operaciones, Dividendos e intereses y Valoración."""
+    """Ventana principal con 5 pestañas: Resumen, Operaciones, Dividendos e intereses, Valoración y Valor diario."""
 
     def __init__(self, portafolio: Portafolio):
         self.portafolio = portafolio
@@ -56,15 +63,18 @@ class Interfaz:
         self.tab_ops = tk.Frame(pestanas, bg=FONDO)
         self.tab_pagos = tk.Frame(pestanas, bg=FONDO)
         self.tab_valor = tk.Frame(pestanas, bg=FONDO)
+        self.tab_diario = tk.Frame(pestanas, bg=FONDO)
         pestanas.add(self.tab_resumen, text="  Resumen  ")
         pestanas.add(self.tab_ops, text="  Operaciones  ")
         pestanas.add(self.tab_pagos, text="  Dividendos e intereses  ")
         pestanas.add(self.tab_valor, text="  Valoración  ")
+        pestanas.add(self.tab_diario, text="  Valor diario  ")
 
         self._armar_resumen()
         self._armar_operaciones()
         self._armar_pagos()
         self._armar_valoracion()
+        self._armar_diario()
         self.actualizar()
         self.root.update_idletasks()
         self.root.lift()
@@ -163,7 +173,10 @@ class Interfaz:
 
     def _actualizar_resumen(self):
         r = self.portafolio.resumen()
-        self.lbl_fecha.config(text=f"Valoración al {r['fecha_corte']:%d/%m/%Y}")
+        trm = f"   ·   TRM {dinero(r['trm'])}" if r["trm"] else "   ·   sin TRM"
+        prueba = any(f.startswith("PRUEBA") for f in self.portafolio.mercado.fuentes())
+        self.lbl_fecha.config(text=f"Valoración al {r['fecha_corte']:%d/%m/%Y}{trm}"
+                                   + ("   ·   ⚠ precios de PRUEBA" if prueba else ""))
         self.kpis["invertido"].config(text=dinero(r["invertido"]))
         self.kpis["valor_actual"].config(text=dinero(r["valor_actual"]))
         self.kpis["ganancia"].config(text=dinero(r["ganancia"]), fg=color_signo(r["ganancia"]))
@@ -243,8 +256,9 @@ class Interfaz:
         self.op_activo.bind("<<ComboboxSelected>>", self._al_elegir_activo)
         self.op_tipo = self._campo(form, "Operación", 2, Operacion.TIPOS_OPERACION, ancho=10)
         self.op_cantidad = self._campo(form, "Cantidad", 3, valor="1", ancho=8)
-        self.op_precio = self._campo(form, "Precio / valor unitario", 4, ancho=18)
-        self.op_comision = self._campo(form, "Comisión del bróker", 5, valor="0", ancho=16)
+        self.op_precio = self._campo(form, "Precio unitario (moneda del activo)", 4, ancho=26)
+        tk.Label(form, text=f"Comisión del bróker: {Operacion.TASA_COMISION:.1%} automática",
+                 bg=FONDO, fg="#555", font=("Segoe UI", 9)).grid(row=1, column=5, padx=8, sticky="w")
 
         form2 = tk.Frame(self.tab_ops, bg=FONDO)
         form2.pack(fill="x", padx=10)
@@ -257,8 +271,8 @@ class Interfaz:
 
         marco, self.tabla_ops = self._tabla(
             self.tab_ops,
-            ("Fecha", "Activo", "Tipo", "Operación", "Cantidad", "Precio", "Comisión", "Flujo de caja"),
-            (90, 120, 70, 90, 80, 110, 100, 130), alto=14)
+            ("Fecha", "Activo", "Tipo", "Operación", "Cantidad", "Moneda", "Precio", "Comisión", "Flujo de caja"),
+            (90, 120, 100, 80, 70, 60, 110, 90, 130), alto=14)
         marco.pack(fill="both", expand=True, padx=10, pady=8)
         ttk.Button(self.tab_ops, text="Eliminar operación seleccionada",
                    command=self._eliminar_operacion).pack(anchor="e", padx=10, pady=(0, 10))
@@ -266,9 +280,9 @@ class Interfaz:
 
     def _al_elegir_activo(self, _evento=None):
         activo = Activo.buscar(self.op_activo.get())
-        self.lbl_info.config(text=f"{activo.ticker} · {activo.tipo} · Sector: {activo.sector}\n"
+        self.lbl_info.config(text=f"{activo.ticker} · {activo.tipo} · {activo.sector} · Moneda: {activo.moneda}\n"
                                   + ("Precio = valor del título; cantidad = 1 si es un solo CDT."
-                                     if activo.es_renta_fija else "Precio = valor de la acción."))
+                                     if activo.es_renta_fija else f"Precio de la acción en {activo.moneda}."))
         for campo, vacio in ((self.op_tasa, "0"), (self.op_venc, "")):
             campo.state(["!disabled"])
             if not activo.es_renta_fija:  # las acciones no tienen tasa ni vencimiento
@@ -283,7 +297,7 @@ class Interfaz:
             op = Operacion(
                 date.fromisoformat(self.op_fecha.get().strip()), activo.tipo, activo.nombre,
                 self.op_tipo.get(), float(self.op_cantidad.get()), float(self.op_precio.get()),
-                float(self.op_comision.get() or 0), float(self.op_tasa.get() or 0) / 100,
+                float(self.op_tasa.get() or 0) / 100,
                 date.fromisoformat(venc) if venc else None)
             self.portafolio.agregar_operacion(op)
         except ValueError as e:
@@ -312,7 +326,7 @@ class Interfaz:
         self.pg_fecha = self._campo(form, "Fecha (AAAA-MM-DD)", 0, valor=date.today().isoformat(), ancho=16)
         self.pg_activo = self._campo(form, "Activo", 1, self.nombres, ancho=16)
         self.pg_tipo = self._campo(form, "Tipo de pago", 2, Pago.TIPOS)
-        self.pg_monto = self._campo(form, "Monto recibido", 3, ancho=16)
+        self.pg_monto = self._campo(form, "Monto recibido (moneda del activo)", 3, ancho=26)
         ttk.Button(form, text="Registrar pago", command=self._registrar_pago
                    ).grid(row=1, column=4, padx=10, pady=(0, 6))
 
@@ -320,7 +334,7 @@ class Interfaz:
                  text=("Dividendo: acciones. Interés: CDT (se descuenta del valor causado). Capital: devolución de "
                        "parte del dinero invertido (reduce el valor del título).")).pack(anchor="w", padx=14)
         marco, self.tabla_pagos = self._tabla(
-            self.tab_pagos, ("Fecha", "Activo", "Tipo", "Monto"), (110, 200, 110, 140), alto=14)
+            self.tab_pagos, ("Fecha", "Activo", "Tipo", "Moneda", "Monto"), (110, 200, 110, 80, 140), alto=14)
         marco.pack(fill="both", expand=True, padx=10, pady=8)
         ttk.Button(self.tab_pagos, text="Eliminar pago seleccionado",
                    command=self._eliminar_pago).pack(anchor="e", padx=10, pady=(0, 10))
@@ -348,8 +362,8 @@ class Interfaz:
     # ---------- Pestaña Valoración ----------
     def _armar_valoracion(self):
         tk.Label(self.tab_valor, bg=FONDO, justify="left", font=("Segoe UI", 9), fg="#555",
-                 text=("Selecciona un activo y escribe su precio de mercado actual. Si no lo haces, las acciones se "
-                       "valoran con su último precio y el CDT con su tasa E.A. (intereses causados hasta hoy).")
+                 text=("Acciones: último cierre de yfinance × TRM del día (o un precio manual en su moneda). "
+                       "CDT, bonos y TES: valor causado a su tasa E.A. (no cotizan en Yahoo Finance).")
                  ).pack(anchor="w", padx=10, pady=(10, 4))
         marco, self.tabla_val = self._tabla(
             self.tab_valor,
@@ -365,6 +379,8 @@ class Interfaz:
                    ).grid(row=1, column=1, padx=10, pady=(0, 6))
         ttk.Button(form, text="Volver a valoración automática", command=self._quitar_precio
                    ).grid(row=1, column=2, padx=4, pady=(0, 6))
+        ttk.Button(form, text="Actualizar precios de mercado (yfinance + TRM)", command=self._actualizar_mercado
+                   ).grid(row=1, column=3, padx=(30, 4), pady=(0, 6))
 
     def _activo_seleccionado(self):
         seleccion = self.tabla_val.selection()
@@ -378,13 +394,10 @@ class Interfaz:
         if nombre is None:
             return
         try:
-            precio = float(self.val_precio.get())
-            if precio < 0:
-                raise ValueError("El precio no puede ser negativo.")
+            self.portafolio.actualizar_precio(nombre, float(self.val_precio.get()))
         except ValueError as e:
             messagebox.showerror("Dato inválido", f"Revisa el precio.\n\n{e}")
             return
-        self.portafolio.actualizar_precio(nombre, precio)
         self.val_precio.delete(0, "end")
         self.actualizar()
 
@@ -393,6 +406,98 @@ class Interfaz:
         if nombre is not None:
             self.portafolio.quitar_precio_manual(nombre)
             self.actualizar()
+
+    def _actualizar_mercado(self):
+        self.root.config(cursor="watch")
+        self.root.update()
+        try:
+            mensaje = self.portafolio.actualizar_mercado()
+        except Exception as e:  # sin internet, yfinance no instalado, etc.
+            messagebox.showerror("Mercado", f"No se pudieron descargar los datos.\n\n{e}\n\n"
+                                            "Revise la conexión e instale yfinance: pip install yfinance")
+            return
+        finally:
+            self.root.config(cursor="")
+        messagebox.showinfo("Mercado", mensaje)
+        self.actualizar()
+
+    # ---------- Pestaña Valor diario ----------
+    def _armar_diario(self):
+        form = tk.Frame(self.tab_diario, bg=FONDO)
+        form.pack(fill="x", padx=10, pady=(10, 0))
+        hoy = self.portafolio.fecha_corte
+        self.dia_desde = self._campo(form, "Desde (AAAA-MM-DD)", 0, valor=(hoy - timedelta(days=365)).isoformat(), ancho=16)
+        self.dia_hasta = self._campo(form, "Hasta (AAAA-MM-DD)", 1, valor=hoy.isoformat(), ancho=16)
+        ttk.Button(form, text="Calcular", command=self._calcular_diario).grid(row=1, column=2, padx=10, pady=(0, 6))
+        ttk.Button(form, text="Exportar CSV", command=self._exportar_diario).grid(row=1, column=3, padx=4, pady=(0, 6))
+        tk.Label(form, bg=FONDO, fg="#555", font=("Segoe UI", 9), justify="left",
+                 text="Cada día: acciones = último cierre × cantidad × TRM del día;\nrenta fija = valor causado a su tasa E.A."
+                 ).grid(row=1, column=4, padx=10, sticky="w")
+        tarjeta = self._tarjeta(self.tab_diario, "Valor del portafolio (COP)")
+        tarjeta.pack(fill="x", padx=10, pady=6)
+        self.canvas_diario = tk.Canvas(tarjeta, width=1020, height=230, bg="white", highlightthickness=0)
+        self.canvas_diario.pack(padx=8, pady=(0, 8))
+        marco, self.tabla_diario = self._tabla(
+            self.tab_diario, ("Fecha", "TRM", "Renta variable", "Renta fija", "Total"), (110, 100, 160, 160, 170), alto=8)
+        marco.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.dias = []
+
+    def _calcular_diario(self):
+        try:
+            desde = date.fromisoformat(self.dia_desde.get().strip())
+            hasta = date.fromisoformat(self.dia_hasta.get().strip())
+            self.dias = self.portafolio.valor_diario(desde, hasta)
+        except ValueError as e:
+            messagebox.showerror("Valor diario", f"Revisa las fechas.\n\n{e}")
+            return
+        self.tabla_diario.delete(*self.tabla_diario.get_children())
+        for d in self.dias:
+            self.tabla_diario.insert("", "end", values=(
+                d["fecha"].isoformat(), dinero(d["trm"]) if d["trm"] else "-", dinero(d["renta_variable"]),
+                dinero(d["renta_fija"]), dinero(d["total"])))
+        self._dibujar_diario()
+
+    def _dibujar_diario(self):
+        c = self.canvas_diario
+        c.delete("all")
+        if not self.dias:
+            return
+        ancho, alto, izq, abajo = 1020, 230, 90, 30
+        mayor = max(d["total"] for d in self.dias) or 1
+        n = max(len(self.dias) - 1, 1)
+        def punto(i, v):
+            return izq + (ancho - izq - 20) * i / n, 15 + (alto - abajo - 15) * (1 - v / mayor)
+        for k in range(5):  # líneas guía
+            v = mayor * k / 4
+            y = punto(0, v)[1]
+            c.create_line(izq, y, ancho - 20, y, fill="#EEF1F6")
+            c.create_text(izq - 6, y, anchor="e", text=dinero(v), font=("Segoe UI", 8), fill="#777")
+        for clave, color, grosor in (("renta_fija", COLOR_FIJA, 1), ("renta_variable", COLOR_VARIABLE, 1), ("total", AZUL, 2)):
+            puntos = [coord for i, d in enumerate(self.dias) for coord in punto(i, d[clave])]
+            if len(puntos) >= 4:
+                c.create_line(*puntos, fill=color, width=grosor)
+        for i in (0, len(self.dias) // 2, len(self.dias) - 1):
+            x = punto(i, 0)[0]
+            c.create_text(x, alto - 12, text=self.dias[i]["fecha"].isoformat(), font=("Segoe UI", 8), fill="#777")
+        for j, (texto, color) in enumerate((("Total", AZUL), ("Renta fija", COLOR_FIJA), ("Renta variable", COLOR_VARIABLE))):
+            c.create_rectangle(izq + 10 + j * 120, 4, izq + 22 + j * 120, 12, fill=color, outline="")
+            c.create_text(izq + 26 + j * 120, 8, anchor="w", text=texto, font=("Segoe UI", 8))
+
+    def _exportar_diario(self):
+        if not self.dias:
+            messagebox.showinfo("Valor diario", "Primero presiona Calcular.")
+            return
+        ruta = filedialog.asksaveasfilename(defaultextension=".csv", initialfile="valor_diario.csv")
+        if not ruta:
+            return
+        nombres = [a.nombre for a in self.activos]
+        with open(ruta, "w", newline="", encoding="utf-8") as archivo:
+            escritor = csv.writer(archivo)
+            escritor.writerow(["fecha", "trm"] + nombres + ["renta_variable", "renta_fija", "total"])
+            for d in self.dias:
+                escritor.writerow([d["fecha"].isoformat(), d["trm"]] + [d["por_activo"].get(n, 0) for n in nombres]
+                                  + [d["renta_variable"], d["renta_fija"], d["total"]])
+        messagebox.showinfo("Valor diario", f"Guardado en {ruta}")
 
     # ---------- Refrescar todo ----------
     def actualizar(self):
@@ -403,12 +508,12 @@ class Interfaz:
         for op in self.portafolio.operaciones_ordenadas():
             fila = self.tabla_ops.insert("", "end", tags=("pos" if op.flujo_caja >= 0 else "neg",), values=(
                 op.fecha.isoformat(), op.activo, op.tipo_activo, op.tipo_operacion, f"{op.cantidad:g}",
-                dinero(op.precio), dinero(op.comision), dinero(op.flujo_caja)))
+                Activo.buscar(op.activo).moneda, numero(op.precio), numero(op.comision), numero(op.flujo_caja)))
             self.ops_en_tabla[fila] = op
 
         for pago in self.portafolio.pagos_ordenados():
             fila = self.tabla_pagos.insert("", "end", values=(
-                pago.fecha.isoformat(), pago.activo, pago.tipo, dinero(pago.monto)))
+                pago.fecha.isoformat(), pago.activo, pago.tipo, Activo.buscar(pago.activo).moneda, numero(pago.monto)))
             self.pagos_en_tabla[fila] = pago
 
         for v in self.portafolio.valoracion():

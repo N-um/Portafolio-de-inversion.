@@ -10,17 +10,17 @@ digraph UML {
   Interfaz [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Interfaz</b></font></td></tr>
     <tr><td align="left" balign="left">- portafolio: Portafolio<br align="left"/>- activos: list[Activo]<br align="left"/>- root: tk.Tk</td></tr>
-    <tr><td align="left" balign="left">+ ejecutar()<br align="left"/>+ actualizar()<br align="left"/>- _registrar_operacion() / _eliminar_operacion()<br align="left"/>- _registrar_pago() / _eliminar_pago()<br align="left"/>- _actualizar_precio() / _quitar_precio()<br align="left"/>- _actualizar_resumen(), _dibujar_torta(), _dibujar_barras()</td></tr></table>>];
+    <tr><td align="left" balign="left">+ ejecutar()<br align="left"/>+ actualizar()<br align="left"/>- _actualizar_mercado()<br align="left"/>- _calcular_diario() / _dibujar_diario() / _exportar_diario()<br align="left"/>- _registrar_operacion() / _eliminar_operacion()<br align="left"/>- _registrar_pago() / _eliminar_pago()<br align="left"/>- _actualizar_precio() / _quitar_precio()<br align="left"/>- _actualizar_resumen(), _dibujar_torta(), _dibujar_barras()</td></tr></table>>];
 
   Portafolio [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Portafolio</b></font></td></tr>
-    <tr><td align="left" balign="left">- ruta: str<br align="left"/>- operaciones: list[Operacion]<br align="left"/>- pagos: list[Pago]<br align="left"/>- precios_manuales: dict[str, float]<br align="left"/>+ fecha_corte: date  «property»</td></tr>
-    <tr><td align="left" balign="left">+ agregar_operacion(op) / eliminar_operacion(op)<br align="left"/>+ agregar_pago(pago) / eliminar_pago(pago)<br align="left"/>+ actualizar_precio(nombre, precio)<br align="left"/>+ quitar_precio_manual(nombre)<br align="left"/>+ operaciones_ordenadas() / pagos_ordenados()<br align="left"/>+ posiciones(): list[Posicion]<br align="left"/>+ resumen(): dict<br align="left"/>+ valoracion(): list[dict]<br align="left"/>+ guardar()<br align="left"/>+ cargar(ruta, fecha_corte) «static»: Portafolio</td></tr></table>>];
+    <tr><td align="left" balign="left">- ruta: str<br align="left"/>- operaciones: list[Operacion]<br align="left"/>- pagos: list[Pago]<br align="left"/>- mercado: Mercado<br align="left"/>+ fecha_corte: date  «property»</td></tr>
+    <tr><td align="left" balign="left">+ agregar_operacion(op) / eliminar_operacion(op)<br align="left"/>+ agregar_pago(pago) / eliminar_pago(pago)<br align="left"/>+ actualizar_precio(nombre, precio)<br align="left"/>+ quitar_precio_manual(nombre)<br align="left"/>+ actualizar_mercado(): str<br align="left"/>+ operaciones_ordenadas() / pagos_ordenados()<br align="left"/>+ posiciones(fecha): list[Posicion]<br align="left"/>+ valor_diario(inicio, fin): list[dict]<br align="left"/>+ resumen(): dict<br align="left"/>+ valoracion(): list[dict]<br align="left"/>+ guardar()<br align="left"/>+ cargar(ruta, fecha_corte) «static»: Portafolio</td></tr></table>>];
 
   Posicion [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Posicion</b></font></td></tr>
-    <tr><td align="left" balign="left">- activo: Activo<br align="left"/>- operaciones: list[Operacion]<br align="left"/>- pagos: list[Pago]<br align="left"/>- fecha_corte: date<br align="left"/>- precio_manual: float | None</td></tr>
-    <tr><td align="left" balign="left">«property» cantidad, cantidad_comprada, compras, ventas,<br align="left"/>comisiones, ingresos, capital, tasa, vencimiento,<br align="left"/>dias_al_vencimiento, origen, valor, precio_actual,<br align="left"/>costo_remanente, ganancia, no_realizada, realizada,<br align="left"/>rent_acumulada, rent_ea<br align="left"/>+ flujos(): list[(date, float)]<br align="left"/>- _valor_causado(): float</td></tr></table>>];
+    <tr><td align="left" balign="left">- activo: Activo<br align="left"/>- operaciones: list[Operacion]<br align="left"/>- pagos: list[Pago]<br align="left"/>- fecha_corte: date<br align="left"/>- mercado: Mercado</td></tr>
+    <tr><td align="left" balign="left">«property» cantidad, cantidad_comprada, compras, ventas,<br align="left"/>comisiones, ingresos, capital, tasa, vencimiento,<br align="left"/>dias_al_vencimiento, origen, valor, precio_actual,<br align="left"/>costo_remanente, ganancia, no_realizada, realizada,<br align="left"/>rent_acumulada, rent_ea<br align="left"/>+ flujos(): list[(date, float)]<br align="left"/>- _a_pesos(monto, fecha): float<br align="left"/>- _precio_mercado(): (float, str)<br align="left"/>- _valor_causado(): float</td></tr></table>>];
 
   Rentabilidad [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Rentabilidad</b></font></td></tr>
@@ -28,18 +28,23 @@ digraph UML {
 
   Activo [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Activo</b></font></td></tr>
-    <tr><td align="left" balign="left">+ nombre, ticker, tipo, clase, sector, color: str<br align="left"/>+ es_renta_fija: bool  «property»</td></tr>
+    <tr><td align="left" balign="left">+ nombre, ticker, tipo, clase, sector, moneda, color: str<br align="left"/>+ es_renta_fija: bool  «property»</td></tr>
     <tr><td align="left" balign="left">+ catalogo() «static»: list[Activo]<br align="left"/>+ buscar(nombre) «static»: Activo</td></tr></table>>];
 
   Operacion [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Operacion</b></font></td></tr>
-    <tr><td align="left" balign="left">+ TIPOS_OPERACION = [Compra, Venta]<br align="left"/>+ fecha: date<br align="left"/>+ tipo_activo, activo, tipo_operacion: str<br align="left"/>+ cantidad, precio, comision, tasa: float<br align="left"/>+ vencimiento: date | None</td></tr>
-    <tr><td align="left" balign="left">«property» es_compra, monto, flujo_caja<br align="left"/>+ a_dict() / desde_dict(d) «static»</td></tr></table>>];
+    <tr><td align="left" balign="left">+ TIPOS_OPERACION = [Compra, Venta]<br align="left"/>+ TASA_COMISION = 0.002<br align="left"/>+ fecha: date<br align="left"/>+ tipo_activo, activo, tipo_operacion: str<br align="left"/>+ cantidad, precio, tasa: float<br align="left"/>+ vencimiento: date | None</td></tr>
+    <tr><td align="left" balign="left">«property» es_compra, monto, comision, flujo_caja<br align="left"/>+ a_dict() / desde_dict(d) «static»</td></tr></table>>];
 
   Pago [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Pago</b></font></td></tr>
     <tr><td align="left" balign="left">+ TIPOS = [Dividendo, Interés, Capital]<br align="left"/>+ fecha: date<br align="left"/>+ activo, tipo: str<br align="left"/>+ monto: float</td></tr>
     <tr><td align="left" balign="left">«property» es_ingreso<br align="left"/>+ a_dict() / desde_dict(d) «static»</td></tr></table>>];
+
+  Mercado [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#1F3A5F"><font color="white"><b>Mercado</b></font></td></tr>
+    <tr><td align="left" balign="left">+ TRM = "TRM", MANUAL = "Manual"<br align="left"/>- ruta: str<br align="left"/>- _series: dict[serie, dict[date, (valor, fuente)]]</td></tr>
+    <tr><td align="left" balign="left">+ dato(serie, fecha): (date, float, str) | None<br align="left"/>+ trm(fecha): float<br align="left"/>+ agregar(serie, fecha, valor, fuente)<br align="left"/>+ quitar_manuales(serie)<br align="left"/>+ descargar_trm(inicio, fin)  «datos.gov.co»<br align="left"/>+ descargar_precios(tickers, inicio, fin)  «yfinance»<br align="left"/>+ fuentes() / filas()<br align="left"/>+ guardar() / cargar(ruta) «static»</td></tr></table>>];
 
   main -> Portafolio [label="  crea", style=dashed, arrowhead=vee];
   main -> Interfaz [label="  crea", style=dashed, arrowhead=vee];
@@ -48,6 +53,8 @@ digraph UML {
   Portafolio -> Operacion [label=" 1   0..*", dir=both, arrowtail=diamond, arrowhead=vee];
   Portafolio -> Pago [label=" 1   0..*", dir=both, arrowtail=diamond, arrowhead=vee];
   Portafolio -> Posicion [label="  crea 0..*", style=dashed, arrowhead=vee];
+  Portafolio -> Mercado [label=" 1   1", dir=both, arrowtail=diamond, arrowhead=vee];
+  Posicion -> Mercado [label=" consulta", style=dashed, arrowhead=vee];
   Posicion -> Activo [label=" 1", arrowhead=vee];
   Posicion -> Operacion [label=" 1..*", arrowhead=vee];
   Posicion -> Pago [label=" 0..*", arrowhead=vee];

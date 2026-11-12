@@ -1,30 +1,65 @@
 # Cálculos financieros
 
-Todas las cifras en pesos colombianos (COP). La base de días es 365, igual que `TIR.NO.PER` de Excel.
+Notación: *q* = cantidad, *P* = precio unitario en la moneda del activo, *c* = 0,2 % (comisión),
+*TRM(d)* = TRM del día *d* (vale 1 para activos en COP), *t* = tasa E.A. del título,
+*V* = fecha de vencimiento, *F* = fecha de corte. Todo resultado queda en pesos (COP).
 
-| Concepto | Fórmula |
-|---|---|
-| Flujo de una compra | −(cantidad × precio + comisión) |
-| Flujo de una venta | +(cantidad × precio − comisión) |
-| Total invertido | Σ (cantidad × precio + comisión) de las compras |
-| Ventas netas | Σ (cantidad × precio − comisión) de las ventas |
-| Valor de una acción | precio manual × cantidad, o último precio de operación × cantidad |
-| Valor de renta fija | Σ compras·(1+t)^(d/365) − Σ (ventas, intereses, capital)·(1+t)^(d/365); 0 si ya venció |
-| Ganancia total | valor actual + ventas netas + dividendos e intereses + capital − total invertido |
-| Costo de lo que aún se tiene | cantidad actual × (total invertido / cantidad comprada) − capital devuelto |
-| Ganancia no realizada | valor actual − costo de lo que aún se tiene |
-| Ganancia realizada | ganancia total − ganancia no realizada |
-| Rentabilidad acumulada | ganancia total / total invertido |
-| Rentabilidad E.A. | tasa *r* que hace Σ flujo / (1+r)^(días/365) = 0 (incluye el valor actual como último flujo) |
+### Operaciones y pagos
 
-**t** = tasa E.A. del título (se toma de su primera compra) y **d** = días desde el movimiento hasta la fecha de corte (sin pasar del vencimiento).
+| # | Concepto | Fórmula |
+|---|---|---|
+| 1 | Monto de una operación | `q × P` |
+| 2 | Comisión del bróker | `c × q × P` (c = 0,2 % en compras y en ventas) |
+| 3 | Flujo de una compra (COP) | `−(q × P + comisión) × TRM(fecha)` |
+| 4 | Flujo de una venta (COP) | `+(q × P − comisión) × TRM(fecha)` |
+| 5 | Flujo de un pago (COP) | `+monto × TRM(fecha del pago)` |
+| 6 | TRM del día *d* | último valor de la serie TRM con fecha ≤ *d* |
 
-## Por qué la renta fija se valora así
-Si un CDT de tasa 10 % E.A. se valora con esta regla, su rentabilidad E.A. calculada da exactamente 10 %. Si un bono paga un cupón igual a su tasa, después del pago vuelve a valer lo invertido. Así, el valor no se "infla" ni se descuenta dos veces lo que ya se cobró.
+### Totales
 
-## Ejemplo verificable a mano
-Compra de 100 acciones a $2.000 con comisión de $600, dividendo de $10.000 y precio actual de $2.200:
-- Total invertido = 200.600
-- Valor actual = 220.000
-- Ganancia = 220.000 + 10.000 − 200.600 = 29.400
-- Rentabilidad acumulada = 29.400 / 200.600 = 14,66 %
+| # | Concepto | Fórmula |
+|---|---|---|
+| 7 | Total invertido | `Σ (q × P + comisión) × TRM(fecha)` de las compras |
+| 8 | Ventas netas | `Σ (q × P − comisión) × TRM(fecha)` de las ventas |
+| 9 | Comisiones pagadas | `Σ comisión × TRM(fecha)` |
+| 10 | Dividendos e intereses | `Σ monto × TRM(fecha)` de pagos tipo Dividendo e Interés |
+| 11 | Pagos de capital | `Σ monto` de pagos tipo Capital (dinero que vuelve, no ganancia) |
+| 12 | Cantidad actual | `Σ q compras − Σ q ventas` (con fecha ≤ *F*) |
+
+### Valoración a la fecha *F*
+
+| # | Concepto | Fórmula |
+|---|---|---|
+| 13 | Valor de una acción | `q actual × último cierre (≤ F) × TRM(F)`; sin cierre: último precio de operación |
+| 14 | Valor de renta fija vigente | `Σ compras_i · (1+t)^((min(F,V) − d_i)/365) − Σ cobros_j · (1+t)^((min(F,V) − d_j)/365)` |
+| 15 | Valor de renta fija vencida (*F* ≥ *V*) | `0` (el capital y los intereses se registran como pagos) |
+| 16 | Valor actual del portafolio | `Σ valor de cada activo` |
+| 17 | Participación renta fija / variable | `valor del grupo / valor actual` |
+
+En la fórmula 14, *compras* = q × P en COP (sin comisión), *cobros* = ventas, intereses y capital,
+y *d* = fecha de cada movimiento. Cada peso invertido crece a la tasa del título y cada peso
+cobrado deja de crecer el día en que se cobra. Con esta regla, un CDT al 10 % E.A. sin comisión rinde
+exactamente 10 % E.A., y un bono cuyo cupón es igual a la tasa vuelve a valer lo invertido después de
+pagarlo. La tasa y el vencimiento se toman de la primera compra del título.
+
+### Resultados
+
+| # | Concepto | Fórmula |
+|---|---|---|
+| 18 | Ganancia total | `valor actual + ventas netas + dividendos e intereses + capital − total invertido` |
+| 19 | Costo de lo que aún se tiene | `q actual × (total invertido / q comprada) − capital` (0 si el título venció) |
+| 20 | Ganancia no realizada | `valor actual − costo de lo que aún se tiene` |
+| 21 | Ganancia realizada | `ganancia total − ganancia no realizada` |
+| 22 | Rentabilidad acumulada | `ganancia total / total invertido` |
+| 23 | Rentabilidad E.A. | la tasa *r* que cumple `Σ flujo_k / (1+r)^((d_k − d_0)/365) = 0` con los flujos 3, 4 y 5 más el valor actual en *F* (= `TIR.NO.PER` / `XIRR` de Excel) |
+| 24 | Peso de un activo | `valor del activo / valor actual del portafolio` |
+| 25 | Días al vencimiento | `max(0, V − F)` |
+
+### Valor diario
+
+| # | Concepto | Fórmula |
+|---|---|---|
+| 26 | Valor del portafolio el día *d* | fórmulas 13 a 16 con *F* = *d*: cantidades a ese día, último cierre ≤ *d*, `TRM(d)` y renta fija causada hasta *d* |
+| 27 | Rango | cada día calendario desde la fecha inicial hasta la final, sin pasar de la fecha de corte |
+
+Lo registrado con fecha posterior a la fecha de corte no se tiene en cuenta en ningún cálculo.

@@ -75,6 +75,14 @@ class Portafolio:
         self.mercado.quitar_manuales(Activo.buscar(nombre).ticker)
         self.guardar()
 
+    def precio_sugerido(self, nombre, fecha):
+        """Cierre de mercado de una acción en esa fecha (o el último antes): (fecha_del_dato, precio, fuente).
+        None si no hay datos o si es renta fija (CDT, bonos y TES no cotizan en Yahoo Finance)."""
+        activo = Activo.buscar(nombre)
+        if activo.es_renta_fija:
+            return None
+        return self.mercado.dato(activo.ticker, fecha)
+
     def actualizar_mercado(self):
         """Descarga la TRM y los cierres de las acciones desde la primera operación hasta la fecha de corte."""
         if not self.operaciones:
@@ -87,7 +95,7 @@ class Portafolio:
         self.guardar()
         mensaje = f"{fuente_trm} y precios de yfinance del {inicio} al {fin}."
         if faltan:
-            mensaje += f"\nSin datos para: {', '.join(faltan)} (se usa su último precio de operación)."
+            mensaje += f"\nSin datos para: {', '.join(faltan)} (se mantienen sus datos anteriores; intente de nuevo)."
         return mensaje
 
     @staticmethod

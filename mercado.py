@@ -99,6 +99,8 @@ class Mercado:
 
     def descargar_precios(self, tickers, inicio, fin):
         cierres = self._cierres_yahoo(tickers, inicio, fin)
+        for ticker in [t for t in tickers if not cierres.get(t)]:  # un reintento, de a uno
+            cierres.update(self._cierres_yahoo([ticker], inicio, fin))
         faltan = [t for t in tickers if not cierres.get(t)]
         for ticker, nuevos in cierres.items():
             if nuevos:
@@ -110,7 +112,8 @@ class Mercado:
         """Precio de cierre SIN ajustar (los dividendos se registran aparte como pagos)."""
         import yfinance as yf  # se importa aquí: solo hace falta para descargar
         datos = yf.download(tickers, start=inicio.isoformat(), end=(fin + timedelta(days=1)).isoformat(),
-                            auto_adjust=False, progress=False)
+                            auto_adjust=False, progress=False,
+                            threads=False)  # en paralelo, Windows puede dar "database is locked"
         if datos is None or datos.empty:
             return {}
         cierres = datos["Close"]

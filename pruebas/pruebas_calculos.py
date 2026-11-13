@@ -106,6 +106,14 @@ class PruebasCalculos(unittest.TestCase):
         self.assertAlmostEqual(dias[1]["total"], 2 * 100 * 4000)         # sin cierre: precio de compra
         self.assertAlmostEqual(dias[-1]["total"], 2 * 110 * 4000)        # último cierre conocido
 
+    def test_precio_sugerido(self):
+        p = portafolio_con_trm(date(2026, 1, 1))
+        p.mercado.agregar("NKE", date(2025, 3, 7), 71.5, "yfinance")       # viernes
+        self.assertEqual(p.precio_sugerido("Nike", date(2025, 3, 9)),     # domingo: último cierre
+                         (date(2025, 3, 7), 71.5, "yfinance"))
+        self.assertIsNone(p.precio_sugerido("Nike", date(2025, 3, 6)))     # antes del primer dato
+        self.assertIsNone(p.precio_sugerido("CDT Bancolombia", date(2025, 3, 9)))  # renta fija
+
     def test_no_vende_mas_de_lo_que_tiene(self):
         p = portafolio_con_trm(date(2026, 1, 1))
         p.agregar_operacion(Operacion(date(2025, 1, 1), RV, "Nike", "Compra", 10, 400))

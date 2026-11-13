@@ -15,7 +15,7 @@ que hace los mismos cálculos con fórmulas.
 
 | Requisito | Dónde |
 |---|---|
-| Registrar compras y ventas (fecha, cantidad, precio) de acciones, CDT, bonos y TES; la comisión se calcula sola | Pestaña **Operaciones** |
+| Registrar compras y ventas (fecha, cantidad, precio) de acciones, CDT, bonos y TES; la comisión se calcula sola y el precio de las acciones se sugiere con el cierre de ese día | Pestaña **Operaciones** |
 | Registrar dividendos, intereses y pagos de capital | Pestaña **Dividendos e intereses** |
 | Traer precios de mercado (yfinance) y TRM; valorar renta fija por tasa, plazo y vencimiento | Pestaña **Valoración** |
 | Total invertido, valor actual, ganancia, comisiones, rentabilidad acumulada y E.A., distribución | Pestaña **Resumen** |
@@ -47,6 +47,10 @@ Los datos se guardan solos: operaciones y pagos en `datos/portafolio.json`, prec
 | TRM | datos.gov.co, conjunto `32sa-8pi3` (TRM certificada por la Superintendencia Financiera) | Si falla, respaldo con el dólar de Yahoo `COP=X`. |
 | CDT, bonos, TES | Tasa E.A. y vencimiento del título | No cotizan en Yahoo Finance; se valoran con su tasa (ver fórmulas). |
 | investing.com | No se usa | Está protegido contra bots (Cloudflare) y sus condiciones de uso prohíben el raspado; un scraper se rompe seguido. |
+
+Al registrar una compra o venta de una acción, el precio se llena solo con el cierre de ese día (o el último
+anterior, si fue fin de semana o aún no hay cierre). Se puede cambiar por el precio real de la operación, que
+puede ser distinto del cierre. La renta fija no tiene precio de mercado en Yahoo: se escribe el valor invertido por título.
 
 Una serie (TRM o un ticker) vale, en una fecha, **su último dato con fecha menor o igual**:
 los fines de semana y festivos se usa el último cierre, y la TRM del viernes cubre el fin de semana.

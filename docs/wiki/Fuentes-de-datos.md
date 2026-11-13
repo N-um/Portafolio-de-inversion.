@@ -2,7 +2,7 @@
 
 | Dato | Fuente | Detalle |
 |---|---|---|
-| Acciones | yfinance (Yahoo Finance) | `ECOPETROL.CL` y `GEB.CL` (Grupo Energía Bogotá), de la Bolsa de Colombia, en COP; `CIB` (Grupo Cibest), `NKE` (Nike) y `NU` (Nu Holdings), de la Bolsa de Nueva York, en USD. Precio de **cierre sin ajustar**, porque los dividendos se registran aparte (el ajustado los contaría dos veces). |
+| Acciones | yfinance (Yahoo Finance) | `ECOPETROL.CL`, `GEB.CL` (Grupo Energía Bogotá) y `PFCIBEST.CL` (Cibest preferencial, antes Bancolombia preferencial), de la Bolsa de Colombia, en COP; `CIB` (ADR de Grupo Cibest = 4 acciones preferenciales), `NKE` (Nike) y `NU` (Nu Holdings), de la Bolsa de Nueva York, en USD. Precio de **cierre sin ajustar**, porque los dividendos se registran aparte (el ajustado los contaría dos veces). |
 | Dividendos | yfinance (`Ticker.dividends`) | Monto bruto por acción y **fecha ex-dividendo**; Yahoo no trae la fecha de pago. Nu Holdings no paga dividendos. Para algunas acciones de la Bolsa de Colombia Yahoo puede no tener el historial: en ese caso se registran a mano. |
 | TRM | datos.gov.co, conjunto `32sa-8pi3` (TRM certificada por la Superintendencia Financiera) | Si falla, respaldo con el dólar de Yahoo `COP=X`. |
 | CDT, bonos, TES | Tasa E.A. y vencimiento del título | No cotizan en Yahoo Finance; se valoran con su tasa (ver fórmulas). |
@@ -17,6 +17,10 @@ acción por los de Yahoo. Cobra un dividendo quien tenía la acción **antes** d
 mismo día o después, no lo cobra; si vendió antes, tampoco. El pago se registra con la fecha ex-dividendo y el monto
 bruto (sin retenciones). Si después se registra otra compra o venta, se vuelve a presionar el botón.
 Si Yahoo no tiene dividendos de una acción, se dejan los que estaban registrados.
+
+**Cambio de símbolo:** Bancolombia pasó a ser Grupo Cibest el 19 de mayo de 2025 (`PFBCOLOM.CL` → `PFCIBEST.CL`), con el mismo
+número de acciones. El programa descarga los dos símbolos y une la historia: antes de esa fecha usa los precios y dividendos
+de `PFBCOLOM.CL`. Se configura con `ticker_anterior` en el catálogo.
 
 **Compras antiguas:** se pueden registrar operaciones de cualquier fecha. Si es una acción en dólares y no hay TRM
 de ese día, el programa ofrece descargar la TRM y los precios desde esa fecha. Después, **Traer dividendos (yfinance)**

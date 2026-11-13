@@ -28,7 +28,7 @@ digraph UML {
 
   Activo [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Activo</b></font></td></tr>
-    <tr><td align="left" balign="left">+ nombre, ticker, tipo, clase, sector, moneda, color: str<br align="left"/>+ es_renta_fija: bool  «property»</td></tr>
+    <tr><td align="left" balign="left">+ nombre, ticker, tipo, clase, sector, moneda, color: str<br align="left"/>+ ticker_anterior: str | None<br align="left"/>+ es_renta_fija: bool  «property»</td></tr>
     <tr><td align="left" balign="left">+ catalogo() «static»: list[Activo]<br align="left"/>+ buscar(nombre) «static»: Activo</td></tr></table>>];
 
   Operacion [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
@@ -44,7 +44,7 @@ digraph UML {
   Mercado [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4">
     <tr><td bgcolor="#1F3A5F"><font color="white"><b>Mercado</b></font></td></tr>
     <tr><td align="left" balign="left">+ TRM = "TRM", MANUAL = "Manual"<br align="left"/>- ruta: str<br align="left"/>- _series: dict[serie, dict[date, (valor, fuente)]]</td></tr>
-    <tr><td align="left" balign="left">+ dato(serie, fecha): (date, float, str) | None<br align="left"/>+ trm(fecha): float<br align="left"/>+ agregar(serie, fecha, valor, fuente)<br align="left"/>+ quitar_manuales(serie)<br align="left"/>+ descargar_trm(inicio, fin)  «datos.gov.co»<br align="left"/>+ descargar_precios(tickers, inicio, fin)  «yfinance»<br align="left"/>+ descargar_dividendos(ticker) «static»  «yfinance»<br align="left"/>+ fuentes() / filas()<br align="left"/>+ guardar() / cargar(ruta) «static»</td></tr></table>>];
+    <tr><td align="left" balign="left">+ dato(serie, fecha): (date, float, str) | None<br align="left"/>+ trm(fecha): float<br align="left"/>+ agregar(serie, fecha, valor, fuente)<br align="left"/>+ quitar_manuales(serie)<br align="left"/>+ unir_anterior(serie, anterior): int<br align="left"/>+ descargar_trm(inicio, fin)  «datos.gov.co»<br align="left"/>+ descargar_precios(tickers, inicio, fin)  «yfinance»<br align="left"/>+ descargar_dividendos(ticker) «static»  «yfinance»<br align="left"/>+ fuentes() / filas()<br align="left"/>+ guardar() / cargar(ruta) «static»</td></tr></table>>];
 
   main -> Portafolio [label="  crea", style=dashed, arrowhead=vee];
   main -> Interfaz [label="  crea", style=dashed, arrowhead=vee];

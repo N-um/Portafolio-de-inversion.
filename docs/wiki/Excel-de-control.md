@@ -22,5 +22,5 @@ python pruebas/llenar_excel.py        # copia los datos del programa al Excel
 # abrir el Excel y guardarlo
 python pruebas/comparar_con_excel.py  # compara totales, activos y cada día
 ```
-Diferencia máxima permitida: 1 centavo en pesos y 0,0001 puntos en tasas. Con los datos de ejemplo coinciden 4.828 de 4.828 valores.
+Diferencia máxima permitida: 1 centavo en pesos y 0,0001 puntos en tasas. Con los datos de ejemplo coinciden 5.194 de 5.194 valores.
 Se probó también con fechas de corte en 2023, 2025, 2027 y 2031, rangos de dos años, precios manuales y títulos vencidos.

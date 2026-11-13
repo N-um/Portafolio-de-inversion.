@@ -312,8 +312,14 @@ class Interfaz:
                 self._precio_auto = ""
             return
         dato = self.portafolio.precio_sugerido(activo.nombre, fecha)
+        if self.portafolio.mercado.dato(activo.ticker, date.max) is None:   # nunca se ha descargado
+            self.lbl_precio.config(text="Sin precios descargados.\nUse 'Actualizar precios'.")
+            if puede_cambiar:
+                self.op_precio.delete(0, "end")
+                self._precio_auto = ""
+            return
         if dato is None:
-            self.lbl_precio.config(text="Sin cierre para esa fecha: escríbalo o\nuse 'Actualizar precios' (baja desde esta fecha).")
+            self.lbl_precio.config(text="Sin cierre para esa fecha.\nUse 'Actualizar precios'.")
             if puede_cambiar:
                 self.op_precio.delete(0, "end")
                 self._precio_auto = ""

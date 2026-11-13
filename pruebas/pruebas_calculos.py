@@ -195,6 +195,36 @@ class PruebasCompraVieja(unittest.TestCase):
         self.assertEqual(nike, [(date(2021, 6, 4), 2.75), (date(2025, 12, 1), 4.1)])   # no el de marzo 2021
 
 
+class PruebasCambioDeSimbolo(unittest.TestCase):
+    """Bancolombia (PFBCOLOM.CL) pasó a ser Grupo Cibest (PFCIBEST.CL) el 19-may-2025."""
+
+    def test_une_precios_y_dividendos_del_simbolo_anterior(self):
+        p = Portafolio(fecha_corte=date(2026, 1, 1))
+        p.agregar_operacion(Operacion(date(2024, 6, 4), RV, "Cibest preferencial", "Compra", 100, 34_500))
+        cierres = {"PFBCOLOM.CL": {date(2024, 6, 4): 34_500.0, date(2025, 5, 16): 41_000.0},
+                   "PFCIBEST.CL": {date(2025, 5, 19): 41_200.0, date(2025, 12, 30): 52_000.0}}
+        def precios(tickers, inicio, fin):
+            for t in tickers:
+                if t in cierres:
+                    p.mercado._reemplazar_serie(t, cierres[t], "yfinance")
+            return [t for t in tickers if t not in cierres]
+        with mock.patch.object(Mercado, "descargar_trm", return_value="prueba"), \
+             mock.patch.object(Mercado, "descargar_precios", side_effect=precios):
+            mensaje = p.actualizar_mercado()
+        self.assertNotIn("PFBCOLOM", mensaje)                        # el símbolo viejo no se reporta como faltante
+        self.assertEqual(p.precio_sugerido("Cibest preferencial", date(2025, 5, 18))[1:],
+                         (41_000.0, "yfinance (PFBCOLOM.CL)"))      # antes del cambio: historia vieja
+        self.assertEqual(p.precio_sugerido("Cibest preferencial", date(2025, 6, 1))[1:], (41_200.0, "yfinance"))
+        self.assertIsNone(p.mercado.dato("PFBCOLOM.CL", date(2026, 1, 1)))   # no queda una serie suelta
+        self.assertAlmostEqual(p.resumen()["valor_actual"], 100 * 52_000)    # en pesos, sin TRM
+        divs = {"PFCIBEST.CL": {date(2025, 6, 27): 950.0},
+                "PFBCOLOM.CL": {date(2024, 6, 27): 936.0, date(2025, 6, 27): 999.0}}  # la vieja se ignora después del cambio
+        with mock.patch.object(Mercado, "descargar_dividendos", side_effect=lambda t: dict(divs.get(t, {}))):
+            p.traer_dividendos()
+        self.assertEqual(sorted((x.fecha, x.monto) for x in p.pagos),
+                         [(date(2024, 6, 27), 93_600.0), (date(2025, 6, 27), 95_000.0)])
+
+
 class PruebasDescargas(unittest.TestCase):
     """Simula las respuestas de datos.gov.co y de yfinance (sin internet)."""
 

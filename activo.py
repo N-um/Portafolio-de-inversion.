@@ -9,7 +9,7 @@ class Activo:
     RENTA_FIJA = "Renta fija"
     RENTA_VARIABLE = "Renta variable"
 
-    def __init__(self, nombre, ticker, tipo, clase, sector, moneda, color):
+    def __init__(self, nombre, ticker, tipo, clase, sector, moneda, color, ticker_anterior=None):
         if tipo not in (Activo.RENTA_FIJA, Activo.RENTA_VARIABLE):
             raise ValueError(f"Tipo de activo desconocido: {tipo}")
         self.nombre = nombre
@@ -19,6 +19,9 @@ class Activo:
         self.sector = sector
         self.moneda = moneda  # COP o USD: moneda en que se registran precios y pagos del activo
         self.color = color    # color usado en los gráficos de la interfaz
+        # símbolo con el que cotizaba antes (p. ej. Bancolombia antes de volverse Grupo Cibest):
+        # su historia de precios y dividendos se une a la del ticker actual
+        self.ticker_anterior = ticker_anterior
 
     @property
     def es_renta_fija(self):
@@ -31,7 +34,9 @@ class Activo:
     def catalogo():
         return [
             Activo("Ecopetrol", "ECOPETROL.CL", Activo.RENTA_VARIABLE, "Acción", "Energía", "COP", "#F18F01"),
-            Activo("Grupo Cibest", "CIB", Activo.RENTA_VARIABLE, "Acción", "Financiero", "USD", "#C73E1D"),
+            Activo("Grupo Cibest", "CIB", Activo.RENTA_VARIABLE, "Acción (ADR)", "Financiero", "USD", "#C73E1D"),
+            Activo("Cibest preferencial", "PFCIBEST.CL", Activo.RENTA_VARIABLE, "Acción", "Financiero", "COP", "#E4572E",
+                   ticker_anterior="PFBCOLOM.CL"),
             Activo("Nike", "NKE", Activo.RENTA_VARIABLE, "Acción", "Consumo", "USD", "#6A4C93"),
             Activo("Grupo Energía Bogotá", "GEB.CL", Activo.RENTA_VARIABLE, "Acción", "Energía", "COP", "#E0A458"),
             Activo("Nu Holdings", "NU", Activo.RENTA_VARIABLE, "Acción", "Financiero", "USD", "#8E44AD"),

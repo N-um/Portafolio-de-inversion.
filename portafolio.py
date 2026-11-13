@@ -83,6 +83,41 @@ class Portafolio:
             return None
         return self.mercado.dato(activo.ticker, fecha)
 
+    def cantidad_antes_de(self, nombre, fecha):
+        """Acciones que se tenían al cierre del día anterior a la fecha (las que cobran un dividendo con esa fecha ex)."""
+        return sum((o.cantidad if o.es_compra else -o.cantidad)
+                   for o in self.operaciones if o.activo == nombre and o.fecha < fecha)
+
+    def dividendos_automaticos(self, nombre, por_accion):
+        """Pagos de dividendo a partir de {fecha ex: monto por acción}: cantidad antes de la fecha ex x monto."""
+        pagos = []
+        for fecha_ex, monto in sorted(por_accion.items()):
+            cantidad = self.cantidad_antes_de(nombre, fecha_ex)
+            if fecha_ex <= self.fecha_corte and cantidad > 0:
+                pagos.append(Pago(fecha_ex, nombre, Pago.DIVIDENDO, round(cantidad * monto, 6)))
+        return pagos
+
+    def traer_dividendos(self):
+        """Reemplaza los dividendos registrados de cada acción por los de yfinance.
+        Si Yahoo no tiene dividendos de una acción, se dejan los que ya estaban."""
+        resumen = []
+        for activo in Activo.catalogo():
+            if activo.es_renta_fija or not any(o.activo == activo.nombre for o in self.operaciones):
+                continue
+            por_accion = self.mercado.descargar_dividendos(activo.ticker)
+            if not por_accion:
+                resumen.append(f"{activo.nombre}: Yahoo no tiene dividendos; se dejan los registrados.")
+                continue
+            nuevos = self.dividendos_automaticos(activo.nombre, por_accion)
+            if activo.moneda == "USD":
+                for pago in nuevos:
+                    self.mercado.trm(pago.fecha)  # valida que haya TRM antes de cambiar nada
+            self.pagos = [x for x in self.pagos if not (x.activo == activo.nombre and x.tipo == Pago.DIVIDENDO)]
+            self.pagos += nuevos
+            resumen.append(f"{activo.nombre}: {len(nuevos)} dividendos.")
+        self.guardar()
+        return "\n".join(resumen) if resumen else "No hay acciones registradas."
+
     def actualizar_mercado(self):
         """Descarga la TRM y los cierres de las acciones desde la primera operación hasta la fecha de corte."""
         if not self.operaciones:

@@ -8,7 +8,7 @@
 ## Pestañas
 - **Resumen:** total invertido, valor actual, ganancia, rentabilidad acumulada y E.A., comisiones, distribución renta fija / variable y tabla por activo.
 - **Operaciones:** compras y ventas. El precio va en la moneda del activo (USD para Nike y Grupo Cibest). La comisión del bróker (0,2 %) se calcula sola. Para acciones, el precio se llena solo con el cierre de ese día (se puede cambiar por el precio real de la compra). En la compra de renta fija se escribe la tasa E.A. (en %) y el vencimiento (AAAA-MM-DD).
-- **Dividendos e intereses:** dividendos (acciones), intereses y pagos de capital (renta fija), en la moneda del activo.
+- **Dividendos e intereses:** dividendos (acciones), intereses y pagos de capital (renta fija), en la moneda del activo. **Traer dividendos (yfinance)** calcula los dividendos de las acciones solo: acciones que se tenían antes de la fecha ex-dividendo × dividendo por acción. **Traer dividendos (yfinance)** calcula los dividendos de las acciones solo: acciones que se tenían antes de la fecha ex-dividendo × dividendo por acción.
 - **Valoración:** descarga de precios y TRM; precio manual para una acción (vale desde la fecha de corte); valor de cada activo.
 - **Valor diario:** escribir *Desde* y *Hasta*, presionar **Calcular**: gráfico y tabla con el valor del portafolio cada día; **Exportar CSV**.
 

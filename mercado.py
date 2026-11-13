@@ -74,6 +74,22 @@ class Mercado:
         self._series[serie].update(manuales)
         self._indice.pop(serie, None)
 
+    def unir_anterior(self, serie, anterior):
+        """Une a la serie la historia descargada con el símbolo anterior, solo en las fechas
+        anteriores al primer dato del símbolo actual. Devuelve cuántos datos se agregaron."""
+        viejos = self._series.pop(anterior, {})
+        self._indice.pop(anterior, None)
+        actuales = self._series.setdefault(serie, {})
+        descargados = [f for f, (_, fu) in actuales.items() if fu != Mercado.MANUAL]
+        corte = min(descargados) if descargados else date.max
+        agregados = 0
+        for f, (v, fu) in viejos.items():
+            if f < corte and f not in actuales:
+                actuales[f] = (v, f"{fu} ({anterior})")
+                agregados += 1
+        self._indice.pop(serie, None)
+        return agregados
+
     # ---------- Descargas ----------
     def descargar_trm(self, inicio, fin):
         """TRM oficial (datos.gov.co). Si falla, usa el dólar de Yahoo (COP=X) como respaldo."""

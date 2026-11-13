@@ -105,6 +105,13 @@ class Portafolio:
             if activo.es_renta_fija or not any(o.activo == activo.nombre for o in self.operaciones):
                 continue
             por_accion = self.mercado.descargar_dividendos(activo.ticker)
+            if activo.ticker_anterior:  # dividendos de antes del cambio de símbolo
+                try:
+                    viejos = self.mercado.descargar_dividendos(activo.ticker_anterior)
+                except Exception:
+                    viejos = {}
+                corte = min(por_accion) if por_accion else date.max
+                por_accion.update({f: v for f, v in viejos.items() if f < corte})
             if not por_accion:
                 resumen.append(f"{activo.nombre}: Yahoo no tiene dividendos; se dejan los registrados.")
                 continue
@@ -127,8 +134,13 @@ class Portafolio:
         inicio = min(fechas) - timedelta(days=10)
         fin = self.fecha_corte
         fuente_trm = self.mercado.descargar_trm(inicio, fin)
-        tickers = [a.ticker for a in Activo.catalogo() if not a.es_renta_fija]
-        faltan = self.mercado.descargar_precios(tickers, inicio, fin)
+        acciones = [a for a in Activo.catalogo() if not a.es_renta_fija]
+        anteriores = [a.ticker_anterior for a in acciones if a.ticker_anterior]
+        faltan = self.mercado.descargar_precios([a.ticker for a in acciones] + anteriores, inicio, fin)
+        for a in acciones:
+            if a.ticker_anterior:
+                self.mercado.unir_anterior(a.ticker, a.ticker_anterior)
+        faltan = [t for t in faltan if t not in anteriores]
         self.guardar()
         mensaje = f"{fuente_trm} y precios de yfinance del {inicio} al {fin}."
         if faltan:

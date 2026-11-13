@@ -254,6 +254,8 @@ class Interfaz:
         self.op_fecha = self._campo(form, "Fecha (AAAA-MM-DD)", 0, valor=date.today().isoformat(), ancho=16)
         self.op_activo = self._campo(form, "Activo", 1, self.nombres, ancho=16)
         self.op_activo.bind("<<ComboboxSelected>>", self._al_elegir_activo)
+        self.op_fecha.bind("<FocusOut>", self._sugerir_precio)
+        self.op_fecha.bind("<Return>", self._sugerir_precio)
         self.op_tipo = self._campo(form, "Operación", 2, Operacion.TIPOS_OPERACION, ancho=10)
         self.op_cantidad = self._campo(form, "Cantidad", 3, valor="1", ancho=8)
         self.op_precio = self._campo(form, "Precio unitario (moneda del activo)", 4, ancho=26)
@@ -268,6 +270,9 @@ class Interfaz:
         self.lbl_info.grid(row=1, column=2, padx=10, sticky="w")
         ttk.Button(form2, text="Registrar operación", command=self._registrar_operacion
                    ).grid(row=1, column=3, padx=10, pady=(0, 6))
+        self.lbl_precio = tk.Label(form2, text="", bg=FONDO, fg=AZUL, font=("Segoe UI", 9), justify="left")
+        self.lbl_precio.grid(row=1, column=4, padx=10, sticky="w")
+        self._precio_auto = ""
 
         marco, self.tabla_ops = self._tabla(
             self.tab_ops,
@@ -289,6 +294,37 @@ class Interfaz:
                 campo.delete(0, "end")
                 campo.insert(0, vacio)
                 campo.state(["disabled"])
+        self._sugerir_precio()
+
+    def _sugerir_precio(self, _evento=None):
+        """Llena el precio con el cierre de mercado de ese día. Se puede cambiar a mano."""
+        try:
+            fecha = date.fromisoformat(self.op_fecha.get().strip())
+            activo = Activo.buscar(self.op_activo.get())
+        except ValueError:
+            return
+        escrito = self.op_precio.get().strip()
+        puede_cambiar = escrito in ("", self._precio_auto)  # no borra un precio escrito a mano
+        if activo.es_renta_fija:
+            self.lbl_precio.config(text="Renta fija: escriba el valor\npor título (no cotiza en Yahoo).")
+            if puede_cambiar:
+                self.op_precio.delete(0, "end")
+                self._precio_auto = ""
+            return
+        dato = self.portafolio.precio_sugerido(activo.nombre, fecha)
+        if dato is None:
+            self.lbl_precio.config(text="Sin cierre para esa fecha:\nescríbalo o actualice precios.")
+            if puede_cambiar:
+                self.op_precio.delete(0, "end")
+                self._precio_auto = ""
+            return
+        fecha_dato, precio, fuente = dato
+        cuando = "de ese día" if fecha_dato == fecha else f"del {fecha_dato}"
+        self.lbl_precio.config(text=f"Sugerido: cierre {cuando}\n({fuente}). Puede cambiarlo.")
+        if puede_cambiar:
+            self._precio_auto = f"{precio:.2f}"
+            self.op_precio.delete(0, "end")
+            self.op_precio.insert(0, self._precio_auto)
 
     def _registrar_operacion(self):
         try:
@@ -304,7 +340,9 @@ class Interfaz:
             messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
             return
         self.op_precio.delete(0, "end")
+        self._precio_auto = ""
         self.actualizar()
+        self._sugerir_precio()
 
     def _eliminar_operacion(self):
         seleccion = self.tabla_ops.selection()
@@ -420,6 +458,7 @@ class Interfaz:
             self.root.config(cursor="")
         messagebox.showinfo("Mercado", mensaje)
         self.actualizar()
+        self._sugerir_precio()
 
     # ---------- Pestaña Valor diario ----------
     def _armar_diario(self):

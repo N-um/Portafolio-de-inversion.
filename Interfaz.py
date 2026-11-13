@@ -313,7 +313,7 @@ class Interfaz:
             return
         dato = self.portafolio.precio_sugerido(activo.nombre, fecha)
         if dato is None:
-            self.lbl_precio.config(text="Sin cierre para esa fecha:\nescríbalo o actualice precios.")
+            self.lbl_precio.config(text="Sin cierre para esa fecha: escríbalo o\nuse 'Actualizar precios' (baja desde esta fecha).")
             if puede_cambiar:
                 self.op_precio.delete(0, "end")
                 self._precio_auto = ""
@@ -335,10 +335,25 @@ class Interfaz:
                 self.op_tipo.get(), float(self.op_cantidad.get()), float(self.op_precio.get()),
                 float(self.op_tasa.get() or 0) / 100,
                 date.fromisoformat(venc) if venc else None)
-            self.portafolio.agregar_operacion(op)
         except ValueError as e:
             messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
             return
+        try:
+            self.portafolio.agregar_operacion(op)
+        except ValueError as e:
+            if not str(e).startswith("No hay TRM"):
+                messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
+                return
+            # Operación en dólares de una fecha sin TRM descargada: se ofrece descargar desde esa fecha.
+            if not messagebox.askyesno("TRM", f"{e}\n\n¿Descargar la TRM y los precios desde el {op.fecha}?"):
+                return
+            if not self._actualizar_mercado(desde=op.fecha):
+                return
+            try:
+                self.portafolio.agregar_operacion(op)
+            except ValueError as e2:
+                messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e2}")
+                return
         self.op_precio.delete(0, "end")
         self._precio_auto = ""
         self.actualizar()
@@ -364,18 +379,37 @@ class Interfaz:
         self.pg_fecha = self._campo(form, "Fecha (AAAA-MM-DD)", 0, valor=date.today().isoformat(), ancho=16)
         self.pg_activo = self._campo(form, "Activo", 1, self.nombres, ancho=16)
         self.pg_tipo = self._campo(form, "Tipo de pago", 2, Pago.TIPOS)
-        self.pg_monto = self._campo(form, "Monto recibido (moneda del activo)", 3, ancho=26)
+        self.pg_monto = self._campo(form, "Monto recibido (moneda del activo)", 3, ancho=22)
         ttk.Button(form, text="Registrar pago", command=self._registrar_pago
                    ).grid(row=1, column=4, padx=10, pady=(0, 6))
+        ttk.Button(form, text="Traer dividendos (yfinance)", command=self._traer_dividendos
+                   ).grid(row=1, column=5, padx=(16, 4), pady=(0, 6))
 
-        tk.Label(self.tab_pagos, bg=FONDO, fg="#555", font=("Segoe UI", 9), justify="left",
-                 text=("Dividendo: acciones. Interés: CDT (se descuenta del valor causado). Capital: devolución de "
-                       "parte del dinero invertido (reduce el valor del título).")).pack(anchor="w", padx=14)
+        tk.Label(self.tab_pagos, bg=FONDO, fg="#555", font=("Segoe UI", 9), justify="left", wraplength=1020,
+                 text=("Dividendo: acciones. Automático: acciones que tenía antes de la fecha ex-dividendo × dividendo "
+                       "por acción.  Interés: CDT, bonos y TES.  Capital: devolución de parte de lo invertido."
+                       )).pack(anchor="w", padx=14)
         marco, self.tabla_pagos = self._tabla(
             self.tab_pagos, ("Fecha", "Activo", "Tipo", "Moneda", "Monto"), (110, 200, 110, 80, 140), alto=14)
         marco.pack(fill="both", expand=True, padx=10, pady=8)
         ttk.Button(self.tab_pagos, text="Eliminar pago seleccionado",
                    command=self._eliminar_pago).pack(anchor="e", padx=10, pady=(0, 10))
+
+    def _traer_dividendos(self):
+        if not messagebox.askyesno("Dividendos", "Se reemplazarán los dividendos registrados de cada acción por los "
+                                                 "de yfinance (fecha ex-dividendo, monto bruto).\n\n¿Continuar?"):
+            return
+        self.root.config(cursor="watch")
+        self.root.update()
+        try:
+            mensaje = self.portafolio.traer_dividendos()
+        except Exception as e:  # sin internet, sin TRM, etc.: no se cambia nada
+            messagebox.showerror("Dividendos", f"No se pudieron traer los dividendos.\n\n{e}")
+            return
+        finally:
+            self.root.config(cursor="")
+        messagebox.showinfo("Dividendos", mensaje)
+        self.actualizar()
 
     def _registrar_pago(self):
         try:
@@ -445,20 +479,27 @@ class Interfaz:
             self.portafolio.quitar_precio_manual(nombre)
             self.actualizar()
 
-    def _actualizar_mercado(self):
+    def _actualizar_mercado(self, desde=None):
+        """Descarga desde la primera operación, o desde la fecha escrita en Operaciones si es anterior."""
+        if desde is None:
+            try:
+                desde = date.fromisoformat(self.op_fecha.get().strip())
+            except ValueError:
+                desde = None
         self.root.config(cursor="watch")
         self.root.update()
         try:
-            mensaje = self.portafolio.actualizar_mercado()
+            mensaje = self.portafolio.actualizar_mercado(desde)
         except Exception as e:  # sin internet, yfinance no instalado, etc.
             messagebox.showerror("Mercado", f"No se pudieron descargar los datos.\n\n{e}\n\n"
                                             "Revise la conexión e instale yfinance: pip install yfinance")
-            return
+            return False
         finally:
             self.root.config(cursor="")
         messagebox.showinfo("Mercado", mensaje)
         self.actualizar()
         self._sugerir_precio()
+        return True
 
     # ---------- Pestaña Valor diario ----------
     def _armar_diario(self):

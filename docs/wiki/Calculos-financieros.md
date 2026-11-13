@@ -55,6 +55,13 @@ pagarlo. La tasa y el vencimiento se toman de la primera compra del título.
 | 24 | Peso de un activo | `valor del activo / valor actual del portafolio` |
 | 25 | Días al vencimiento | `max(0, V − F)` |
 
+### Dividendos automáticos (yfinance)
+
+| # | Concepto | Fórmula |
+|---|---|---|
+| 28 | Acciones con derecho al dividendo | `Σ q compras − Σ q ventas` con fecha **anterior** a la fecha ex-dividendo |
+| 29 | Dividendo automático (moneda del activo) | `acciones con derecho × dividendo por acción`; fecha del pago = fecha ex-dividendo; luego se pasa a COP con la fórmula 5 |
+
 ### Valor diario
 
 | # | Concepto | Fórmula |
@@ -63,3 +70,8 @@ pagarlo. La tasa y el vencimiento se toman de la primera compra del título.
 | 27 | Rango | cada día calendario desde la fecha inicial hasta la final, sin pasar de la fecha de corte |
 
 Lo registrado con fecha posterior a la fecha de corte no se tiene en cuenta en ningún cálculo.
+
+## Agregar otra acción
+Una línea en `Activo.catalogo()` (archivo `activo.py`) con el nombre, el ticker de Yahoo (las de la Bolsa de Colombia
+terminan en `.CL`), el tipo, la clase, el sector, la moneda y un color; y la misma fila en la hoja **Activos** del Excel.
+El Excel tiene espacio para 10 activos.

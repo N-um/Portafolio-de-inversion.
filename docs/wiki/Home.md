@@ -8,6 +8,6 @@ con precios de yfinance, TRM oficial, comisión del bróker de 0,2 % y valoraci�
 ## Páginas
 - [[Instalación y uso|Instalacion-y-uso]]
 - [[Fuentes de datos|Fuentes-de-datos]]
-- [[Cálculos financieros|Calculos-financieros]] (las 27 fórmulas)
+- [[Cálculos financieros|Calculos-financieros]] (las 29 fórmulas)
 - [[Excel de control|Excel-de-control]]
 - [[Diagrama de clases|Diagrama-de-clases]]

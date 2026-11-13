@@ -108,6 +108,16 @@ class Mercado:
         return faltan
 
     @staticmethod
+    def descargar_dividendos(ticker):
+        """Dividendos por acción de yfinance: {fecha ex-dividendo: monto por acción en la moneda del activo}.
+        Yahoo los publica por fecha ex-dividendo (no trae la fecha de pago) y en valor bruto."""
+        import yfinance as yf
+        serie = yf.Ticker(ticker).dividends
+        if serie is None or len(serie) == 0:
+            return {}
+        return {i.date(): float(v) for i, v in serie.items() if float(v) > 0}
+
+    @staticmethod
     def _cierres_yahoo(tickers, inicio, fin):
         """Precio de cierre SIN ajustar (los dividendos se registran aparte como pagos)."""
         import yfinance as yf  # se importa aquí: solo hace falta para descargar

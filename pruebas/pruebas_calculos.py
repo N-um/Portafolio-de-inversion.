@@ -133,6 +133,68 @@ class PruebasCalculos(unittest.TestCase):
             p.agregar_pago(Pago(date(2025, 3, 1), "Ecopetrol", "Interés", 1000))
 
 
+class PruebasDividendos(unittest.TestCase):
+
+    def test_cobra_solo_lo_que_tenia_antes_de_la_fecha_ex(self):
+        p = portafolio_con_trm(date(2026, 1, 1))
+        p.agregar_operacion(Operacion(date(2025, 1, 10), RV, "Nike", "Compra", 10, 70))
+        p.agregar_operacion(Operacion(date(2025, 3, 3), RV, "Nike", "Compra", 5, 70))   # el mismo día ex: no cobra
+        p.agregar_operacion(Operacion(date(2025, 9, 1), RV, "Nike", "Venta", 15, 75))
+        por_accion = {date(2024, 12, 2): 0.40,     # antes de comprar: nada
+                      date(2025, 3, 3): 0.40,      # 10 acciones
+                      date(2025, 6, 2): 0.40,      # 15 acciones
+                      date(2025, 12, 1): 0.41}     # ya vendió todo: nada
+        pagos = p.dividendos_automaticos("Nike", por_accion)
+        self.assertEqual([(x.fecha, x.monto) for x in pagos],
+                         [(date(2025, 3, 3), 4.0), (date(2025, 6, 2), 6.0)])
+
+    def test_reemplaza_los_dividendos_y_deja_si_yahoo_no_tiene(self):
+        p = portafolio_con_trm(date(2026, 1, 1))
+        p.agregar_operacion(Operacion(date(2025, 1, 10), RV, "Nike", "Compra", 10, 70))
+        p.agregar_operacion(Operacion(date(2025, 1, 10), RV, "Ecopetrol", "Compra", 100, 2000))
+        p.agregar_pago(Pago(date(2025, 4, 1), "Nike", "Dividendo", 3.4))            # escrito a mano
+        p.agregar_pago(Pago(date(2025, 4, 1), "Ecopetrol", "Dividendo", 10_000))     # escrito a mano
+        datos = {"NKE": {date(2025, 3, 3): 0.40}, "ECOPETROL.CL": {}}
+        with mock.patch.object(Mercado, "descargar_dividendos", side_effect=lambda t: datos[t]):
+            mensaje = p.traer_dividendos()
+        self.assertEqual(sorted((x.activo, x.fecha, x.monto) for x in p.pagos),
+                         [("Ecopetrol", date(2025, 4, 1), 10_000), ("Nike", date(2025, 3, 3), 4.0)])
+        self.assertIn("Nike: 1 dividendos", mensaje)
+
+    def test_lee_el_historial_de_yfinance(self):
+        import pandas as pd
+        serie = pd.Series([0.37, 0.40], index=pd.DatetimeIndex(["2024-12-02", "2025-03-03"], tz="America/New_York"))
+        falso = types.SimpleNamespace(Ticker=lambda t: types.SimpleNamespace(dividends=serie))
+        with mock.patch.dict(sys.modules, {"yfinance": falso}):
+            self.assertEqual(Mercado.descargar_dividendos("NKE"), {date(2024, 12, 2): 0.37, date(2025, 3, 3): 0.40})
+
+
+class PruebasCompraVieja(unittest.TestCase):
+
+    def test_compra_anterior_a_todo_descarga_desde_esa_fecha_y_trae_sus_dividendos(self):
+        p = Portafolio(fecha_corte=date(2026, 1, 1))
+        p.agregar_operacion(Operacion(date(2025, 6, 1), RV, "Ecopetrol", "Compra", 10, 2000))
+        vieja = Operacion(date(2021, 5, 10), RV, "Nike", "Compra", 10, 150)
+        with self.assertRaises(ValueError):                      # sin TRM de 2021 no se puede registrar
+            p.agregar_operacion(vieja)
+        rangos = []
+        def trm_falsa(inicio, fin):
+            rangos.append(inicio)
+            p.mercado.agregar(Mercado.TRM, inicio, 3700, "prueba")
+            return "prueba"
+        with mock.patch.object(Mercado, "descargar_trm", side_effect=trm_falsa), \
+             mock.patch.object(Mercado, "descargar_precios", return_value=[]):
+            p.actualizar_mercado(desde=vieja.fecha)
+        self.assertEqual(rangos, [date(2021, 4, 30)])            # 10 días antes de la compra vieja
+        p.agregar_operacion(vieja)
+        divs = {"NKE": {date(2021, 3, 5): 0.275, date(2021, 6, 4): 0.275, date(2025, 12, 1): 0.41},
+                "ECOPETROL.CL": {}}
+        with mock.patch.object(Mercado, "descargar_dividendos", side_effect=lambda t: divs[t]):
+            p.traer_dividendos()
+        nike = sorted((x.fecha, x.monto) for x in p.pagos if x.activo == "Nike")
+        self.assertEqual(nike, [(date(2021, 6, 4), 2.75), (date(2025, 12, 1), 4.1)])   # no el de marzo 2021
+
+
 class PruebasDescargas(unittest.TestCase):
     """Simula las respuestas de datos.gov.co y de yfinance (sin internet)."""
 

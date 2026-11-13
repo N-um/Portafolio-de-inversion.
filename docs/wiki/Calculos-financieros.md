@@ -74,4 +74,4 @@ Lo registrado con fecha posterior a la fecha de corte no se tiene en cuenta en n
 ## Agregar otra acción
 Una línea en `Activo.catalogo()` (archivo `activo.py`) con el nombre, el ticker de Yahoo (las de la Bolsa de Colombia
 terminan en `.CL`), el tipo, la clase, el sector, la moneda y un color; y la misma fila en la hoja **Activos** del Excel.
-El Excel tiene espacio para 10 activos.
+El Excel tiene espacio para 15 activos.

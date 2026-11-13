@@ -99,8 +99,10 @@ def main():
     comparar("Rentabilidad acumulada", r["rent_acumulada"], celda["Rentabilidad acumulada"], True)
     comparar("Rentabilidad E.A.", r["rent_ea"], celda["Rentabilidad efectiva anual (E.A.)"], True)
 
-    for fila in valores["Por activo"].iter_rows(min_row=5, max_row=14, values_only=True):
+    for fila in valores["Por activo"].iter_rows(min_row=5, values_only=True):
         nombre = fila[0]
+        if nombre == "TOTAL":
+            break
         if not nombre or nombre not in r["por_activo"]:
             continue
         a = r["por_activo"][nombre]
@@ -115,7 +117,9 @@ def main():
         comparar("Peso", a["peso"], fila[25], True)
 
     diario = valores["Valor diario"]
-    nombres = [diario.cell(7, c).value for c in range(3, 13)]
+    encabezado = [c.value for c in diario[7]]
+    col_rv = encabezado.index("Renta variable")
+    nombres = encabezado[2:col_rv]
     excel_dias = [f for f in diario.iter_rows(min_row=8, values_only=True) if f[0] not in (None, "")]
     antes = comparar.total, comparar.fallas
     if excel_dias:
@@ -133,9 +137,9 @@ def main():
             for k, nombre in enumerate(nombres):
                 if nombre:
                     comparar(f"{dia} {nombre}", p["por_activo"].get(nombre, 0.0), e[2 + k], mostrar=False)
-            comparar(f"{dia} Renta variable", p["renta_variable"], e[12], mostrar=False)
-            comparar(f"{dia} Renta fija", p["renta_fija"], e[13], mostrar=False)
-            comparar(f"{dia} Total", p["total"], e[14], mostrar=False)
+            comparar(f"{dia} Renta variable", p["renta_variable"], e[col_rv], mostrar=False)
+            comparar(f"{dia} Renta fija", p["renta_fija"], e[col_rv + 1], mostrar=False)
+            comparar(f"{dia} Total", p["total"], e[col_rv + 2], mostrar=False)
         print(f"\nValor diario del {excel_dias[0][0]:%Y-%m-%d} al {excel_dias[-1][0]:%Y-%m-%d}: "
               f"{len(excel_dias)} días, {comparar.total - antes[0] - (comparar.fallas - antes[1])} de "
               f"{comparar.total - antes[0]} valores coinciden.")

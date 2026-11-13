@@ -87,7 +87,7 @@ class Portafolio:
         self.guardar()
         mensaje = f"{fuente_trm} y precios de yfinance del {inicio} al {fin}."
         if faltan:
-            mensaje += f"\nSin datos para: {', '.join(faltan)} (se usa su último precio de operación)."
+            mensaje += f"\nSin datos para: {', '.join(faltan)} (se mantienen sus datos anteriores; intente de nuevo)."
         return mensaje
 
     @staticmethod

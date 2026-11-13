@@ -18,6 +18,10 @@ mismo día o después, no lo cobra; si vendió antes, tampoco. El pago se regist
 bruto (sin retenciones). Si después se registra otra compra o venta, se vuelve a presionar el botón.
 Si Yahoo no tiene dividendos de una acción, se dejan los que estaban registrados.
 
+**Compras antiguas:** se pueden registrar operaciones de cualquier fecha. Si es una acción en dólares y no hay TRM
+de ese día, el programa ofrece descargar la TRM y los precios desde esa fecha. Después, **Traer dividendos (yfinance)**
+calcula todos los dividendos desde esa compra. El Excel admite hasta 20.000 filas de mercado (unos 13 años).
+
 Una serie (TRM o un ticker) vale, en una fecha, **su último dato con fecha menor o igual**:
 los fines de semana y festivos se usa el último cierre, y la TRM del viernes cubre el fin de semana.
 

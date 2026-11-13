@@ -12,6 +12,9 @@
 - **Valoración:** descarga de precios y TRM; precio manual para una acción (vale desde la fecha de corte); valor de cada activo.
 - **Valor diario:** escribir *Desde* y *Hasta*, presionar **Calcular**: gráfico y tabla con el valor del portafolio cada día; **Exportar CSV**.
 
+## Compras antiguas
+Se pueden registrar operaciones de cualquier fecha. Si es una acción en dólares sin TRM de ese día, el programa ofrece descargar la TRM y los precios desde esa fecha. Luego **Traer dividendos (yfinance)** calcula los dividendos desde esa compra.
+
 ## Reglas que valida el programa
 - No se puede vender más unidades de las que se tienen en esa fecha.
 - La compra de renta fija exige tasa y un vencimiento posterior a la fecha de compra.

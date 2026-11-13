@@ -22,7 +22,7 @@ RUTA_EXCEL = os.path.join(CARPETA, "excel", "Portafolio_control.xlsx")
 RUTA_DATOS = os.path.join(CARPETA, "datos", "portafolio.json")
 
 # hoja: (primera fila, última fila, número de columnas de datos)
-CAPACIDAD = {"Operaciones": (5, 64, 7), "Pagos": (5, 104, 4), "Mercado": (5, 8004, 4)}
+CAPACIDAD = {"Operaciones": (5, 64, 7), "Pagos": (5, 104, 4), "Mercado": (5, 20004, 4)}
 
 
 def escribir(hoja, filas):

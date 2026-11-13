@@ -313,7 +313,7 @@ class Interfaz:
             return
         dato = self.portafolio.precio_sugerido(activo.nombre, fecha)
         if dato is None:
-            self.lbl_precio.config(text="Sin cierre para esa fecha:\nescríbalo o actualice precios.")
+            self.lbl_precio.config(text="Sin cierre para esa fecha: escríbalo o\nuse 'Actualizar precios' (baja desde esta fecha).")
             if puede_cambiar:
                 self.op_precio.delete(0, "end")
                 self._precio_auto = ""
@@ -335,10 +335,25 @@ class Interfaz:
                 self.op_tipo.get(), float(self.op_cantidad.get()), float(self.op_precio.get()),
                 float(self.op_tasa.get() or 0) / 100,
                 date.fromisoformat(venc) if venc else None)
-            self.portafolio.agregar_operacion(op)
         except ValueError as e:
             messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
             return
+        try:
+            self.portafolio.agregar_operacion(op)
+        except ValueError as e:
+            if not str(e).startswith("No hay TRM"):
+                messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e}")
+                return
+            # Operación en dólares de una fecha sin TRM descargada: se ofrece descargar desde esa fecha.
+            if not messagebox.askyesno("TRM", f"{e}\n\n¿Descargar la TRM y los precios desde el {op.fecha}?"):
+                return
+            if not self._actualizar_mercado(desde=op.fecha):
+                return
+            try:
+                self.portafolio.agregar_operacion(op)
+            except ValueError as e2:
+                messagebox.showerror("Dato inválido", f"Revisa los datos.\n\n{e2}")
+                return
         self.op_precio.delete(0, "end")
         self._precio_auto = ""
         self.actualizar()
@@ -464,20 +479,27 @@ class Interfaz:
             self.portafolio.quitar_precio_manual(nombre)
             self.actualizar()
 
-    def _actualizar_mercado(self):
+    def _actualizar_mercado(self, desde=None):
+        """Descarga desde la primera operación, o desde la fecha escrita en Operaciones si es anterior."""
+        if desde is None:
+            try:
+                desde = date.fromisoformat(self.op_fecha.get().strip())
+            except ValueError:
+                desde = None
         self.root.config(cursor="watch")
         self.root.update()
         try:
-            mensaje = self.portafolio.actualizar_mercado()
+            mensaje = self.portafolio.actualizar_mercado(desde)
         except Exception as e:  # sin internet, yfinance no instalado, etc.
             messagebox.showerror("Mercado", f"No se pudieron descargar los datos.\n\n{e}\n\n"
                                             "Revise la conexión e instale yfinance: pip install yfinance")
-            return
+            return False
         finally:
             self.root.config(cursor="")
         messagebox.showinfo("Mercado", mensaje)
         self.actualizar()
         self._sugerir_precio()
+        return True
 
     # ---------- Pestaña Valor diario ----------
     def _armar_diario(self):

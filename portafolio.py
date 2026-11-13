@@ -118,11 +118,13 @@ class Portafolio:
         self.guardar()
         return "\n".join(resumen) if resumen else "No hay acciones registradas."
 
-    def actualizar_mercado(self):
-        """Descarga la TRM y los cierres de las acciones desde la primera operación hasta la fecha de corte."""
-        if not self.operaciones:
+    def actualizar_mercado(self, desde=None):
+        """Descarga la TRM y los cierres de las acciones hasta la fecha de corte, desde la primera
+        operación o desde la fecha 'desde' si es anterior (p. ej. una compra vieja que se va a registrar)."""
+        fechas = [o.fecha for o in self.operaciones] + ([desde] if desde else [])
+        if not fechas:
             raise ValueError("Primero registre alguna operación.")
-        inicio = min(o.fecha for o in self.operaciones) - timedelta(days=10)
+        inicio = min(fechas) - timedelta(days=10)
         fin = self.fecha_corte
         fuente_trm = self.mercado.descargar_trm(inicio, fin)
         tickers = [a.ticker for a in Activo.catalogo() if not a.es_renta_fija]

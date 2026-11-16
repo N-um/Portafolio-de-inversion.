@@ -1,187 +1,132 @@
 # Seguimiento de portafolio de inversión
 
-Programa en Python con interfaz gráfica (Tkinter) para registrar y evaluar un portafolio de
-**renta variable** (acciones) y **renta fija** (CDT, bonos y TES). Descarga los precios de las
-acciones con **yfinance** y la **TRM oficial** de datos.gov.co, cobra la **comisión del bróker
-(0,2 % por transacción)**, calcula la rentabilidad acumulada y la **efectiva anual (E.A.)**, y
-valora el portafolio **día por día** en el rango de fechas que se elija.
+Proyecto de la materia. Es un programa en Python con ventana (Tkinter) para llevar el control de un portafolio de inversión con acciones, CDT, bonos y TES. Con él se pueden registrar compras, ventas, dividendos e intereses, y ver cuánto se ha invertido, cuánto vale hoy el portafolio y cuál ha sido la rentabilidad.
 
-Los resultados se comprueban contra el **Excel de control** (`excel/Portafolio_control.xlsx`),
-que hace los mismos cálculos con fórmulas.
+Para comprobar que las cuentas estén bien, hicimos los mismos cálculos a mano en un Excel (`excel/Portafolio_control.xlsx`) y escribimos un script que compara los resultados del programa con los del Excel.
 
 ![Pantalla de resumen](docs/img/interfaz_resumen.png)
 
-## Qué hace
+## Qué hace el programa
 
-| Requisito | Dónde |
-|---|---|
-| Registrar compras y ventas (fecha, cantidad, precio) de acciones, CDT, bonos y TES; la comisión se calcula sola y el precio de las acciones se sugiere con el cierre de ese día | Pestaña **Operaciones** |
-| Registrar dividendos, intereses y pagos de capital; los dividendos de las acciones se pueden traer automáticamente de yfinance | Pestaña **Dividendos e intereses** |
-| Traer precios de mercado (yfinance) y TRM; valorar renta fija por tasa, plazo y vencimiento | Pestaña **Valoración** |
-| Total invertido, valor actual, ganancia, comisiones, rentabilidad acumulada y E.A., distribución | Pestaña **Resumen** |
-| Valor del portafolio cada día entre dos fechas (gráfico, tabla y CSV) | Pestaña **Valor diario** |
+El programa tiene cinco pestañas:
+
+- **Resumen:** total invertido, valor actual, ganancia, comisiones, rentabilidad acumulada y efectiva anual, y cuánto hay en renta fija y en renta variable.
+- **Operaciones:** para registrar compras y ventas. La comisión del bróker (0,2 %) se calcula sola, y en las acciones el precio se llena con el cierre de ese día (se puede cambiar).
+- **Dividendos e intereses:** para registrar dividendos, intereses y pagos de capital. Los dividendos de las acciones también se pueden traer automáticamente.
+- **Valoración:** descarga los precios de las acciones y la TRM, y muestra lo que vale cada activo.
+- **Valor diario:** muestra cuánto valía el portafolio cada día entre dos fechas, con un gráfico.
 
 ![Valor diario](docs/img/interfaz_valor_diario.png)
 
-## Cómo ejecutarlo
+## Cómo correrlo
 
-Requiere Python 3.10 o superior.
-
-```bash
-pip install -r requirements.txt           # yfinance (descargas) y openpyxl (comparar con el Excel)
-python main.py                            # valora a la fecha de hoy
-python main.py --fecha-corte 2026-11-11   # valora a una fecha fija
-```
-
-Primer uso: en **Valoración**, presionar **Actualizar precios de mercado (yfinance + TRM)**.
-El repositorio trae datos de mercado de **PRUEBA (sintéticos)** solo para que el programa
-funcione sin internet; el encabezado lo avisa con "⚠ precios de PRUEBA" hasta que se descargan los reales.
-
-Los datos se guardan solos: operaciones y pagos en `datos/portafolio.json`, precios y TRM en `datos/mercado.csv`.
-
-## Fuentes de datos
-
-| Dato | Fuente | Detalle |
-|---|---|---|
-| Acciones | yfinance (Yahoo Finance) | `ECOPETROL.CL`, `GEB.CL` (Grupo Energía Bogotá) y `PFCIBEST.CL` (Cibest preferencial, antes Bancolombia preferencial), de la Bolsa de Colombia, en COP; `CIB` (ADR de Grupo Cibest = 4 acciones preferenciales), `NKE` (Nike) y `NU` (Nu Holdings), de la Bolsa de Nueva York, en USD. Precio de **cierre sin ajustar**, porque los dividendos se registran aparte (el ajustado los contaría dos veces). |
-| Dividendos | yfinance (`Ticker.dividends`) | Monto bruto por acción y **fecha ex-dividendo**; Yahoo no trae la fecha de pago. Nu Holdings no paga dividendos. Para algunas acciones de la Bolsa de Colombia Yahoo puede no tener el historial: en ese caso se registran a mano. |
-| TRM | datos.gov.co, conjunto `32sa-8pi3` (TRM certificada por la Superintendencia Financiera) | Si falla, respaldo con el dólar de Yahoo `COP=X`. |
-| CDT, bonos, TES | Tasa E.A. y vencimiento del título | No cotizan en Yahoo Finance; se valoran con su tasa (ver fórmulas). |
-| investing.com | No se usa | Está protegido contra bots (Cloudflare) y sus condiciones de uso prohíben el raspado; un scraper se rompe seguido. |
-
-Al registrar una compra o venta de una acción, el precio se llena solo con el cierre de ese día (o el último
-anterior, si fue fin de semana o aún no hay cierre). Se puede cambiar por el precio real de la operación, que
-puede ser distinto del cierre. La renta fija no tiene precio de mercado en Yahoo: se escribe el valor invertido por título.
-
-**Dividendos automáticos:** el botón **Traer dividendos (yfinance)** reemplaza los dividendos registrados de cada
-acción por los de Yahoo. Cobra un dividendo quien tenía la acción **antes** de la fecha ex-dividendo: si compró ese
-mismo día o después, no lo cobra; si vendió antes, tampoco. El pago se registra con la fecha ex-dividendo y el monto
-bruto (sin retenciones). Si después se registra otra compra o venta, se vuelve a presionar el botón.
-Si Yahoo no tiene dividendos de una acción, se dejan los que estaban registrados.
-
-**Cambio de símbolo:** Bancolombia pasó a ser Grupo Cibest el 19 de mayo de 2025 (`PFBCOLOM.CL` → `PFCIBEST.CL`), con el mismo
-número de acciones. El programa descarga los dos símbolos y une la historia: antes de esa fecha usa los precios y dividendos
-de `PFBCOLOM.CL`. Se configura con `ticker_anterior` en el catálogo.
-
-**Compras antiguas:** se pueden registrar operaciones de cualquier fecha. Si es una acción en dólares y no hay TRM
-de ese día, el programa ofrece descargar la TRM y los precios desde esa fecha. Después, **Traer dividendos (yfinance)**
-calcula todos los dividendos desde esa compra. El Excel admite hasta 20.000 filas de mercado (unos 13 años).
-
-Una serie (TRM o un ticker) vale, en una fecha, **su último dato con fecha menor o igual**:
-los fines de semana y festivos se usa el último cierre, y la TRM del viernes cubre el fin de semana.
-
-## Fórmulas
-
-Notación: *q* = cantidad, *P* = precio unitario en la moneda del activo, *c* = 0,2 % (comisión),
-*TRM(d)* = TRM del día *d* (vale 1 para activos en COP), *t* = tasa E.A. del título,
-*V* = fecha de vencimiento, *F* = fecha de corte. Todo resultado queda en pesos (COP).
-
-### Operaciones y pagos
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 1 | Monto de una operación | `q × P` |
-| 2 | Comisión del bróker | `c × q × P` (c = 0,2 % en compras y en ventas) |
-| 3 | Flujo de una compra (COP) | `−(q × P + comisión) × TRM(fecha)` |
-| 4 | Flujo de una venta (COP) | `+(q × P − comisión) × TRM(fecha)` |
-| 5 | Flujo de un pago (COP) | `+monto × TRM(fecha del pago)` |
-| 6 | TRM del día *d* | último valor de la serie TRM con fecha ≤ *d* |
-
-### Totales
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 7 | Total invertido | `Σ (q × P + comisión) × TRM(fecha)` de las compras |
-| 8 | Ventas netas | `Σ (q × P − comisión) × TRM(fecha)` de las ventas |
-| 9 | Comisiones pagadas | `Σ comisión × TRM(fecha)` |
-| 10 | Dividendos e intereses | `Σ monto × TRM(fecha)` de pagos tipo Dividendo e Interés |
-| 11 | Pagos de capital | `Σ monto` de pagos tipo Capital (dinero que vuelve, no ganancia) |
-| 12 | Cantidad actual | `Σ q compras − Σ q ventas` (con fecha ≤ *F*) |
-
-### Valoración a la fecha *F*
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 13 | Valor de una acción | `q actual × último cierre (≤ F) × TRM(F)`; sin cierre: último precio de operación |
-| 14 | Valor de renta fija vigente | `Σ compras_i · (1+t)^((min(F,V) − d_i)/365) − Σ cobros_j · (1+t)^((min(F,V) − d_j)/365)` |
-| 15 | Valor de renta fija vencida (*F* ≥ *V*) | `0` (el capital y los intereses se registran como pagos) |
-| 16 | Valor actual del portafolio | `Σ valor de cada activo` |
-| 17 | Participación renta fija / variable | `valor del grupo / valor actual` |
-
-En la fórmula 14, *compras* = q × P en COP (sin comisión), *cobros* = ventas, intereses y capital,
-y *d* = fecha de cada movimiento. Cada peso invertido crece a la tasa del título y cada peso
-cobrado deja de crecer el día en que se cobra. Con esta regla, un CDT al 10 % E.A. sin comisión rinde
-exactamente 10 % E.A., y un bono cuyo cupón es igual a la tasa vuelve a valer lo invertido después de
-pagarlo. La tasa y el vencimiento se toman de la primera compra del título.
-
-### Resultados
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 18 | Ganancia total | `valor actual + ventas netas + dividendos e intereses + capital − total invertido` |
-| 19 | Costo de lo que aún se tiene | `q actual × (total invertido / q comprada) − capital` (0 si el título venció) |
-| 20 | Ganancia no realizada | `valor actual − costo de lo que aún se tiene` |
-| 21 | Ganancia realizada | `ganancia total − ganancia no realizada` |
-| 22 | Rentabilidad acumulada | `ganancia total / total invertido` |
-| 23 | Rentabilidad E.A. | la tasa *r* que cumple `Σ flujo_k / (1+r)^((d_k − d_0)/365) = 0` con los flujos 3, 4 y 5 más el valor actual en *F* (= `TIR.NO.PER` / `XIRR` de Excel) |
-| 24 | Peso de un activo | `valor del activo / valor actual del portafolio` |
-| 25 | Días al vencimiento | `max(0, V − F)` |
-
-### Dividendos automáticos (yfinance)
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 28 | Acciones con derecho al dividendo | `Σ q compras − Σ q ventas` con fecha **anterior** a la fecha ex-dividendo |
-| 29 | Dividendo automático (moneda del activo) | `acciones con derecho × dividendo por acción`; fecha del pago = fecha ex-dividendo; luego se pasa a COP con la fórmula 5 |
-
-### Valor diario
-
-| # | Concepto | Fórmula |
-|---|---|---|
-| 26 | Valor del portafolio el día *d* | fórmulas 13 a 16 con *F* = *d*: cantidades a ese día, último cierre ≤ *d*, `TRM(d)` y renta fija causada hasta *d* |
-| 27 | Rango | cada día calendario desde la fecha inicial hasta la final, sin pasar de la fecha de corte |
-
-Lo registrado con fecha posterior a la fecha de corte no se tiene en cuenta en ningún cálculo.
-
-### Agregar otra acción
-Una línea en `Activo.catalogo()` (archivo `activo.py`) con el nombre, el ticker de Yahoo (las de la Bolsa de Colombia
-terminan en `.CL`), el tipo, la clase, el sector, la moneda y un color; y la misma fila en la hoja **Activos** del Excel.
-El Excel tiene espacio para 15 activos.
-
-## Comprobar contra el Excel
+Se necesita Python 3.10 o más nuevo. En la terminal, dentro de la carpeta del proyecto:
 
 ```bash
-python pruebas/llenar_excel.py        # copia operaciones, pagos y mercado del programa al Excel
-# abrir excel/Portafolio_control.xlsx en Excel y guardarlo (recalcula todo)
-python pruebas/comparar_con_excel.py  # compara cada indicador, cada activo y cada día
-python -m unittest discover -s pruebas -p "pruebas_*.py"   # casos verificables a mano
+pip install -r requirements.txt
+python main.py
 ```
 
-Con los datos de ejemplo coinciden **5.194 de 5.194 valores** (totales, cada activo y 366 días del
-valor diario), con un margen de 1 centavo en pesos y de 0,0001 puntos en tasas. También se probaron fechas de corte de
-2023, 2025, 2027 y 2031, rangos de 2 años, precios manuales y títulos vencidos.
+En Windows puede ser `py` en vez de `python`.
 
-## Estructura (una clase por archivo)
+La primera vez hay que ir a **Valoración** y darle a **Actualizar precios de mercado**. El proyecto trae unos precios de prueba inventados para que funcione sin internet, y arriba sale un aviso hasta que se descargan los reales.
 
-| Archivo | Clase | Responsabilidad |
-|---|---|---|
-| `main.py` | — | Archivo principal: carga los datos y abre la interfaz |
-| `Interfaz.py` | `Interfaz` | Ventana con las 5 pestañas |
-| `portafolio.py` | `Portafolio` | Guarda operaciones y pagos, valida, arma el resumen y el valor diario |
-| `posicion.py` | `Posicion` | Resultados de un activo en una fecha (fórmulas 7 a 25) |
-| `mercado.py` | `Mercado` | Precios, TRM y dividendos: consulta, descarga (yfinance, datos.gov.co) y CSV |
-| `rentabilidad.py` | `Rentabilidad` | Rentabilidad acumulada y E.A. (TIR) |
-| `activo.py` | `Activo` | Catálogo de instrumentos (6 acciones, 2 CDT, 1 bono, 1 TES), con ticker, moneda y símbolo anterior |
-| `operacion.py` | `Operacion` | Una compra o venta, con su comisión |
-| `pago.py` | `Pago` | Un dividendo, interés o pago de capital |
+Las operaciones y los pagos se guardan en `datos/portafolio.json`, y los precios y la TRM en `datos/mercado.csv`.
 
-![Diagrama UML](docs/img/uml_clases.png)
+## De dónde salen los datos
+
+- **Precios de las acciones:** de Yahoo Finance con la librería `yfinance`. Usamos Ecopetrol, Grupo Energía Bogotá y Cibest preferencial (antes Bancolombia) de la Bolsa de Colombia, en pesos, y Nike, Nu Holdings y el ADR de Grupo Cibest de la Bolsa de Nueva York, en dólares. Tomamos el precio de cierre normal y no el ajustado, porque el ajustado ya incluye los dividendos y los contaríamos dos veces.
+- **TRM:** la oficial, de datos.gov.co. Si esa página falla, se usa el dólar de Yahoo.
+- **Dividendos:** también de `yfinance`. Yahoo los da por fecha ex-dividendo (no trae la fecha de pago) y sin descontar impuestos.
+- **CDT, bonos y TES:** no están en Yahoo, así que se valoran con su tasa y su fecha de vencimiento.
+
+Pensamos en sacar los datos de investing.com, pero esa página bloquea los programas que intentan leerla y sus condiciones no lo permiten, así que no la usamos.
+
+Cuando no hay precio un día (fin de semana o festivo), se usa el último que haya. Lo mismo con la TRM.
+
+## Cómo se calcula
+
+Todo termina en pesos. Lo que está en dólares se pasa a pesos con la TRM del día en que pasó.
+
+**Compras y ventas**
+
+1. Monto = cantidad × precio
+2. Comisión = 0,2 % × monto
+3. Lo que sale en una compra = (monto + comisión) × TRM del día
+4. Lo que entra en una venta = (monto − comisión) × TRM del día
+5. Lo que entra por un pago (dividendo, interés o capital) = monto × TRM del día
+
+**Totales**
+
+6. Total invertido = suma de lo que salió en las compras
+7. Ventas netas = suma de lo que entró en las ventas
+8. Comisiones = suma de todas las comisiones
+9. Dividendos e intereses = suma de esos pagos
+10. Pagos de capital = suma de la plata que devuelve la renta fija (no es ganancia, es plata que vuelve)
+11. Cantidad actual = cantidad comprada − cantidad vendida
+
+**Cuánto vale cada cosa**
+
+12. Acción = cantidad actual × último precio de cierre × TRM de hoy. Si no hay precio descargado, se usa el último precio de compra o venta.
+13. CDT, bono o TES vigente = lo invertido va creciendo con la tasa del título, y lo que ya se cobró deja de crecer desde el día en que se cobró:
+    `valor = Σ compras × (1 + tasa)^(días/365) − Σ cobros × (1 + tasa)^(días/365)`
+14. Título vencido = 0, porque el capital y los intereses ya se registraron como pagos.
+15. Valor del portafolio = suma del valor de todos los activos
+16. Peso de cada activo = valor del activo / valor del portafolio
+
+Con la fórmula 13 un CDT al 10 % E.A. sin comisión da exactamente 10 % E.A., y un bono que paga un cupón igual a su tasa vuelve a valer lo mismo que se invirtió. Por eso la escogimos.
+
+**Ganancia y rentabilidad**
+
+17. Ganancia total = valor actual + ventas netas + dividendos e intereses + capital − total invertido
+18. Costo de lo que todavía tenemos = cantidad actual × (total invertido / cantidad comprada) − capital devuelto (0 si el título ya venció)
+19. Ganancia no realizada = valor actual − costo de lo que todavía tenemos
+20. Ganancia realizada = ganancia total − ganancia no realizada
+21. Rentabilidad acumulada = ganancia total / total invertido
+22. Rentabilidad efectiva anual = la tasa que hace que todos los flujos traídos a valor presente den cero, contando el valor actual como último flujo. Es lo mismo que la función `TIR.NO.PER` (XIRR) de Excel, con años de 365 días.
+23. Días al vencimiento = fecha de vencimiento − hoy
+
+**Dividendos automáticos**
+
+24. Acciones con derecho al dividendo = las que se tenían antes de la fecha ex-dividendo. Si se compró ese mismo día o después, no se cobra.
+25. Dividendo = acciones con derecho × dividendo por acción. Se registra con la fecha ex-dividendo.
+
+**Valor diario**
+
+26. El valor de cada día se calcula como si ese día fuera hoy: cantidades a ese día, último cierre, TRM de ese día y renta fija con la tasa.
+
+## Comparar con el Excel
+
+```bash
+python pruebas/llenar_excel.py          # pasa los datos del programa al Excel
+python pruebas/comparar_con_excel.py    # compara los resultados
+python -m unittest discover -s pruebas -p "pruebas_*.py"
+```
+
+Entre el primero y el segundo hay que abrir el Excel, guardarlo y cerrarlo, para que recalcule. El script compara los totales, cada activo y cada día del valor diario. Con los datos de ejemplo coinciden todos los valores (permitimos una diferencia de un centavo).
+
+## Archivos del proyecto
+
+Cada clase está en su propio archivo:
+
+- `main.py`: archivo principal, abre el programa.
+- `Interfaz.py`: la ventana con las pestañas.
+- `portafolio.py`: guarda las operaciones y los pagos, y arma el resumen.
+- `posicion.py`: los cálculos de un activo (valor, ganancia, rentabilidad).
+- `mercado.py`: los precios, la TRM y las descargas.
+- `rentabilidad.py`: rentabilidad acumulada y efectiva anual.
+- `activo.py`: la lista de activos con su ticker y moneda.
+- `operacion.py`: una compra o venta.
+- `pago.py`: un dividendo, interés o pago de capital.
+
+Para agregar otra acción basta con una línea en `activo.py` y la misma fila en la hoja Activos del Excel. Las acciones de la Bolsa de Colombia en Yahoo terminan en `.CL`.
+
+![Diagrama de clases](docs/img/uml_clases.png)
 
 ## Equipo
 
-Proyecto de clase. Ramas: `main`, `David` (interfaz), `Cris`, `Sebas` (modelo de cálculo, mercado, Excel de control y documentación).
+Ramas: `main`, `David` (interfaz), `Cris` y `Sebas` (cálculos, datos de mercado, Excel y documentación).
 
-##Uso de inteligencia Artificial
+## Uso de inteligencia artificial
 
-Parte del codigo, el Excel de control y la documentacion se desarrollaron con la ayuda de la ayuda de Claudia. El equipo´probó el programa y los cálculos.
-
+Parte del código, el Excel de control y la documentación se hicieron con ayuda de Claude (Anthropic), un asistente de IA. Nosotros revisamos el código, probamos el programa y validamos los cálculos contra el Excel.

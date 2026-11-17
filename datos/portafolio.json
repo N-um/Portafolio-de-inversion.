@@ -179,6 +179,16 @@
       "precio": 62.69,
       "tasa": 0.0,
       "vencimiento": null
+    },
+    {
+      "fecha": "2024-11-17",
+      "tipo_activo": "Renta variable",
+      "activo": "Coca-Cola",
+      "tipo_operacion": "Compra",
+      "cantidad": 100.0,
+      "precio": 61.74,
+      "tasa": 0.0,
+      "vencimiento": null
     }
   ],
   "pagos": [

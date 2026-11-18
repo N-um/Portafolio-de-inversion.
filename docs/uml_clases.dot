@@ -1,0 +1,58 @@
+digraph UML {
+  graph [rankdir=TB, fontname="Helvetica", nodesep=0.6, ranksep=0.6, label="Diagrama de clases", labelloc=t, fontsize=16];
+  node  [shape=plain, fontname="Helvetica", fontsize=11];
+  edge  [fontname="Helvetica", fontsize=9, color="#444444"];
+
+  main [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5">
+    <tr><td><b>main.py</b></td></tr></table>>];
+
+  Interfaz [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Interfaz</b></td></tr>
+    <tr><td align="left" balign="left">- portafolio: Portafolio</td></tr>
+    <tr><td align="left" balign="left">+ ejecutar()<br/>+ actualizar()</td></tr></table>>];
+
+  Portafolio [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Portafolio</b></td></tr>
+    <tr><td align="left" balign="left">- operaciones: list<br/>- pagos: list<br/>- mercado: Mercado<br/>+ /fecha_corte: date</td></tr>
+    <tr><td align="left" balign="left">+ agregar_operacion(op)<br/>+ agregar_pago(pago)<br/>+ actualizar_mercado()<br/>+ traer_dividendos()<br/>+ resumen(): dict<br/>+ valor_diario(inicio, fin): list<br/>+ guardar()<br/>+ cargar(ruta)</td></tr></table>>];
+
+  Posicion [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Posicion</b></td></tr>
+    <tr><td align="left" balign="left">- activo: Activo<br/>- operaciones: list<br/>- pagos: list<br/>+ /cantidad: float<br/>+ /valor: float<br/>+ /ganancia: float<br/>+ /rent_acumulada: float<br/>+ /rent_ea: float</td></tr>
+    <tr><td align="left" balign="left">+ flujos(): list</td></tr></table>>];
+
+  Mercado [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Mercado</b></td></tr>
+    <tr><td align="left" balign="left">- ruta: str</td></tr>
+    <tr><td align="left" balign="left">+ dato(serie, fecha)<br/>+ trm(fecha): float<br/>+ descargar_precios(...)<br/>+ descargar_trm(...)<br/>+ descargar_dividendos(ticker)<br/>+ guardar()</td></tr></table>>];
+
+  Rentabilidad [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Rentabilidad</b></td></tr>
+    <tr><td align="left" balign="left">+ acumulada(ganancia, invertido)<br/>+ efectiva_anual(flujos)</td></tr></table>>];
+
+  Activo [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Activo</b></td></tr>
+    <tr><td align="left" balign="left">+ nombre: str<br/>+ ticker: str<br/>+ tipo: str<br/>+ moneda: str</td></tr>
+    <tr><td align="left" balign="left">+ catalogo(): list<br/>+ buscar(nombre): Activo</td></tr></table>>];
+
+  Operacion [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Operacion</b></td></tr>
+    <tr><td align="left" balign="left">+ fecha: date<br/>+ activo: str<br/>+ tipo_operacion: str<br/>+ cantidad: float<br/>+ precio: float<br/>+ /comision: float<br/>+ /flujo_caja: float</td></tr></table>>];
+
+  Pago [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="5">
+    <tr><td bgcolor="#DDE6F0"><b>Pago</b></td></tr>
+    <tr><td align="left" balign="left">+ fecha: date<br/>+ activo: str<br/>+ tipo: str<br/>+ monto: float</td></tr></table>>];
+
+  main -> Interfaz [label=" crea", style=dashed];
+  main -> Portafolio [label=" carga", style=dashed];
+  Interfaz -> Portafolio [label=" usa"];
+  Portafolio -> Operacion [label=" 0..*", dir=both, arrowtail=diamond];
+  Portafolio -> Pago [label=" 0..*", dir=both, arrowtail=diamond];
+  Portafolio -> Mercado [label=" 1", dir=both, arrowtail=diamond];
+  Portafolio -> Posicion [label=" crea", style=dashed];
+  Posicion -> Activo [label=" 1"];
+  Posicion -> Rentabilidad [label=" usa", style=dashed];
+  Posicion -> Mercado [label=" consulta", style=dashed];
+  { rank=same; Operacion; Pago; Mercado; }
+  { rank=same; Activo; Rentabilidad; }
+}

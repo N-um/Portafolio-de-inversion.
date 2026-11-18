@@ -1,0 +1,78 @@
+{
+  "operaciones": [
+    {
+      "fecha": "2023-01-30",
+      "tipo_activo": "Renta variable",
+      "activo": "Nike",
+      "tipo_operacion": "Compra",
+      "cantidad": 20.0,
+      "precio": 127.0,
+      "tasa": 0.0,
+      "vencimiento": null
+    },
+    {
+      "fecha": "2023-02-14",
+      "tipo_activo": "Renta variable",
+      "activo": "Coca-Cola",
+      "tipo_operacion": "Compra",
+      "cantidad": 50.0,
+      "precio": 60.0,
+      "tasa": 0.0,
+      "vencimiento": null
+    },
+    {
+      "fecha": "2023-02-28",
+      "tipo_activo": "Renta variable",
+      "activo": "Coca-Cola",
+      "tipo_operacion": "Venta",
+      "cantidad": 50.0,
+      "precio": 59.5,
+      "tasa": 0.0,
+      "vencimiento": null
+    },
+    {
+      "fecha": "2023-06-22",
+      "tipo_activo": "Renta variable",
+      "activo": "Nike",
+      "tipo_operacion": "Venta",
+      "cantidad": 20.0,
+      "precio": 110.0,
+      "tasa": 0.0,
+      "vencimiento": null
+    },
+    {
+      "fecha": "2023-01-30",
+      "tipo_activo": "Renta variable",
+      "activo": "Nike",
+      "tipo_operacion": "Compra",
+      "cantidad": 5.0,
+      "precio": 127.0,
+      "tasa": 0.0,
+      "vencimiento": null
+    },
+    {
+      "fecha": "2023-06-22",
+      "tipo_activo": "Renta variable",
+      "activo": "Nike",
+      "tipo_operacion": "Venta",
+      "cantidad": 5.0,
+      "precio": 110.0,
+      "tasa": 0.0,
+      "vencimiento": null
+    }
+  ],
+  "pagos": [
+    {
+      "fecha": "2023-02-04",
+      "activo": "Nike",
+      "tipo": "Dividendo",
+      "monto": 6.8
+    },
+    {
+      "fecha": "2023-06-01",
+      "activo": "Nike",
+      "tipo": "Dividendo",
+      "monto": 6.8
+    }
+  ]
+}

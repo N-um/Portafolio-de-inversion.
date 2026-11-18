@@ -40,7 +40,6 @@ class Activo:
             Activo("Nike", "NKE", Activo.RENTA_VARIABLE, "Acción", "Consumo", "USD", "#6A4C93"),
             Activo("Grupo Energía Bogotá", "GEB.CL", Activo.RENTA_VARIABLE, "Acción", "Energía", "COP", "#E0A458"),
             Activo("Nu Holdings", "NU", Activo.RENTA_VARIABLE, "Acción", "Financiero", "USD", "#8E44AD"),
-            Activo("Coca-Cola", "KO", Activo.RENTA_VARIABLE, "Acción", "Consumo", "USD", "#D62828"),
             Activo("CDT Davivienda", "CDT-DAV", Activo.RENTA_FIJA, "CDT", "Financiero", "COP", "#2E86AB"),
             Activo("CDT Bancolombia", "CDT-BCO", Activo.RENTA_FIJA, "CDT", "Financiero", "COP", "#3BB273"),
             Activo("Bono Ecopetrol", "BONO-ECO", Activo.RENTA_FIJA, "Bono", "Energía", "COP", "#1F3A5F"),

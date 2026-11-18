@@ -129,4 +129,4 @@ Ramas: `main`, `David` (interfaz), `Cris` y `Sebas` (cálculos, datos de mercado
 
 ## Uso de inteligencia artificial
 
-Parte del código, el Excel de control y la documentación se hicieron con ayuda de Claude (Anthropic), un asistente de IA. Nosotros revisamos el código, probamos el programa y validamos los cálculos contra el Excel.
+Parte del código, el Excel de control y la documentación se hicieron con ayuda de Claude. Nosotros revisamos, probamos el programa y validamos los cálculos contra el Excel.
